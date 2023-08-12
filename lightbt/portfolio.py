@@ -342,15 +342,16 @@ class Portfolio:
 
         Parameters
         ----------
-        date
-        size_type
-        asset
-        size
-        fill_price
-        last_price
-        commission
-        date_diff
-        time_diff
+        arr
+            - date
+            - size_type
+            - asset
+            - size
+            - fill_price
+            - last_price
+            - commission
+            - date_diff
+            - time_diff
 
         """
         _date: np.int64 = arr['date'][-1]
@@ -365,28 +366,6 @@ class Portfolio:
         # 每日收盘记录绩效
         if _date_diff:
             self.update_performances(_date)
-
-    def run_bar3(self,
-                 idx: np.ndarray,
-                 arr: np.ndarray) -> None:
-        """三层截面信号处理。分组遍历二层截面信号处理。
-
-        Parameters
-        ----------
-        idx
-        date
-        size_type
-        asset
-        size
-        fill_price
-        last_price
-        commission
-        date_diff
-        time_diff
-
-        """
-        for i, j in zip(idx[:-1], idx[1:]):
-            self.run_bar2(arr[i:j])
 
     def __str__(self):
         # 这个要少调用，很慢

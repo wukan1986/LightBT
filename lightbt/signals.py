@@ -1,35 +1,4 @@
-from typing import Tuple
-
-import numpy as np
 import pandas as pd
-
-from lightbt.enums import order_outside_dt
-
-
-def orders_to_array(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
-    """将DataFrame转成指定ndarray
-
-    Parameters
-    ----------
-    df: pd.DataFrame
-        - date
-        - size_type
-        - asset
-        - size
-        - fill_price
-        - last_price
-        - commission
-        - date_diff
-        - time_diff
-
-    Returns
-    -------
-
-    """
-    arr = np.asarray(df[list(order_outside_dt.names)].to_records(index=False), dtype=order_outside_dt)
-    idx = np.argwhere(arr['time_diff']).reshape(-1)
-    idx = np.append(idx, [len(arr)])
-    return idx, arr
 
 
 def orders_daily(df: pd.DataFrame, mapping_asset_int: dict) -> pd.DataFrame:

@@ -6,10 +6,10 @@ import numpy as np
 import pandas as pd
 
 from lightbt import LightBT, warmup
-from lightbt.enums import SizeType
-from lightbt.signals import orders_daily, orders_to_array
+from lightbt.enums import SizeType, order_outside_dt
+from lightbt.signals import orders_daily
 from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
-from lightbt.utils import Timer
+from lightbt.utils import Timer, groupby_np
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
@@ -62,7 +62,7 @@ with Timer():
 
 # %% 交易
 with Timer():
-    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
+    bt.run_bar(groupby_np(orders_daily(df, bt.mapping_asset_int), by='time_diff', dtype=order_outside_dt))
 
 # %% 查看最终持仓
 positions = bt.positions()

@@ -4,7 +4,9 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
-from lightbt.signals import orders_daily, orders_to_array
+from lightbt.enums import order_outside_dt
+from lightbt.signals import orders_daily
+from lightbt.utils import groupby_np
 
 
 class LightBT:
@@ -122,18 +124,10 @@ class LightBT:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def run_bar(self, idx: np.ndarray, arr: np.ndarray) -> None:
-        """可按指定设置更新数据
-
-        Parameters
-        ----------
-        idx: np.ndarray
-            分组的开始与结束位置。一维
-        arr: np.ndarray
-            已经按时间排序的全体数据。一维
-
-        """
-        self.pf.run_bar3(idx, arr)
+    def run_bar(self, arrs) -> None:
+        """可按指定设置更新数据"""
+        for arr in arrs:
+            self.pf.run_bar2(arr)
 
 
 def warmup() -> float:
@@ -174,7 +168,7 @@ def warmup() -> float:
     bt.setup(conf)
     bt.pf.deposit(10000 * 50)
 
-    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
+    bt.run_bar(groupby_np(orders_daily(df, bt.mapping_asset_int), by='time_diff', dtype=order_outside_dt))
 
     bt.trades()
     bt.positions()
