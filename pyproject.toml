@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lightbt"
+authors = [
+    {name = "wukan", email = "wu-kan@163.com"},
+]
+description = "lightweight backtester"
+readme = "README.md"
+requires-python = ">=3.7"
+keywords = ["backtest"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+dependencies = [
+    "numba",
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+packages = ["lightbt"]
+
+[tool.setuptools.dynamic]
+version = {attr = "lightbt._version.__version__"}
