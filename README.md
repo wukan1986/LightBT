@@ -1,0 +1,2 @@
+# LightBT
+lightweight backtester
