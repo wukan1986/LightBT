@@ -34,6 +34,9 @@
 1. 使用对象来维护每种资产的交易信息。其中的成员变量全是最新值
 2. 根据时间的推进和交易指令，更新对应对象
 3. 指定时间间隔获取对象成员变量的快照，将所有快照连起来便成总体绩效
+    - 月频交易，但日频取快照
+    - 周频交易，周频取快照
+    - 分钟交易，日频取快照
 
 ## 安装
 ```commandline
@@ -68,7 +71,7 @@ with Timer():
 
 # %% 交易
 with Timer():
-    bt.run_all(df)
+    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
 
 # %% 查看最终持仓
 positions = bt.positions()

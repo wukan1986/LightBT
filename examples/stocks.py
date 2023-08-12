@@ -1,5 +1,5 @@
 # %%
-import os
+
 # os.environ['NUMBA_DISABLE_JIT'] = '1'
 
 import numpy as np
@@ -7,6 +7,7 @@ import pandas as pd
 
 from lightbt import LightBT, warmup
 from lightbt.enums import SizeType
+from lightbt.signals import orders_daily, orders_to_array
 from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
 from lightbt.utils import Timer
 
@@ -23,7 +24,7 @@ date = pd.date_range('2000-01-1', periods=_N)
 
 conf = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0})
 
-CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0)*np.random.randint(1, 100, _K)
+CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0) * np.random.randint(1, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
 
 SMA10 = CLOSE.rolling(10).mean()
@@ -61,7 +62,7 @@ with Timer():
 
 # %% 交易
 with Timer():
-    bt.run_all(df)
+    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
 
 # %% 查看最终持仓
 positions = bt.positions()

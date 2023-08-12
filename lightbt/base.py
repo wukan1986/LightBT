@@ -4,7 +4,7 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
-from lightbt.enums import order_outside_dt
+from lightbt.signals import orders_daily, orders_to_array
 
 
 class LightBT:
@@ -122,37 +122,17 @@ class LightBT:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def run_all(self, df: pd.DataFrame) -> None:
-        """整体运行策略。适合策略回测场景
+    def run_bar(self, idx: np.ndarray, arr: np.ndarray) -> None:
+        """可按指定设置更新数据
 
         Parameters
         ----------
-        df: pd.DataFrame
-            - date
-            - size_type
-            - asset
-            - size
-            - fill_price
-            - last_price
+        idx: np.ndarray
+            分组的开始与结束位置。一维
+        arr: np.ndarray
+            已经按时间排序的全体数据。一维
 
         """
-        # 这一步比较慢，是否能再提速
-        df['asset'] = df['asset'].map(self.mapping_asset_int)
-
-        # 提前排序，之后就可以直接使用
-        df.sort_values(by=['date'], inplace=True)
-
-        # 按日期标记，每段的最后一天标记为True
-        date_0 = df['date'].dt.date
-        df['date_diff'] = date_0 != date_0.shift(-1)
-        # 按日期时间标记，每段的第一天标记为True
-        time_0 = df['date']
-        df['time_diff'] = time_0 != time_0.shift(1)
-
-        arr = np.asarray(df[list(order_outside_dt.names)].to_records(index=False), dtype=order_outside_dt)
-        idx = np.argwhere(arr['time_diff']).reshape(-1)
-        idx = np.append(idx, [len(arr)])
-
         self.pf.run_bar3(idx, arr)
 
 
@@ -193,7 +173,8 @@ def warmup() -> float:
     bt = LightBT()
     bt.setup(conf)
     bt.pf.deposit(10000 * 50)
-    bt.run_all(df)
+
+    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
 
     bt.trades()
     bt.positions()

@@ -1,4 +1,5 @@
 from typing import NamedTuple
+
 import numpy as np
 
 
@@ -76,14 +77,14 @@ position_dt = np.dtype([
 # 外部下单指令，用于将用户的指令转成内部指令
 order_outside_dt = np.dtype([
     ('date', np.int64),
-    ('asset', int),
     ('size_type', int),
+    ('asset', int),
     ('size', float),
     ('fill_price', float),
     ('last_price', float),
     ('commission', float),
-    ('date_diff', bool),
-    ('time_diff', bool),
+    ('date_diff', bool),  # 标记换日，会触发绩效更新
+    ('time_diff', bool),  # 标记同时间截面，用于时序分组
 ], align=True)
 
 # 内部下单指令。用于将上层的目标持仓等信息转换成实际下单指令

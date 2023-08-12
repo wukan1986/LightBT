@@ -308,10 +308,21 @@ class Portfolio:
         # 过滤无效操作
         return orders[orders['qty'] > 0]
 
-    def run_bar(self,
-                date: np.int64, size_type: int,
-                asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> None:
-        """同一截面，时间相同，先平后开"""
+    def run_bar1(self,
+                 date: np.int64, size_type: int,
+                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> None:
+        """一层截面信号处理。只处理同时间截面上所有资产的交易信号
+
+        Parameters
+        ----------
+        date
+        size_type
+        asset
+        size
+        fill_price
+        commission
+
+        """
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price, commission)
 
         # 先平仓
@@ -326,25 +337,56 @@ class Portfolio:
             _o = orders_open[i]
             self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'], _o['commission'])
 
-    def run_bar2(self,
-                 date: np.int64, size_type: int,
-                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray,
-                 last_price: np.ndarray,
-                 date_diff: bool) -> None:
-        # 先执行交易
-        self.run_bar(date, size_type, asset, size, fill_price, commission)
-        # 更新最新价。浮动盈亏得到了调整
-        self.update_last_price(asset, last_price)
-        # 每日收盘记录绩效
-        if date_diff:
-            self.update_performances(date)
+    def run_bar2(self, arr: np.ndarray) -> None:
+        """二层截面信号处理。在一层截面信号的基础上多了最新价更新，以及绩效记录
 
-    def run_bar3(self, idx: np.ndarray, arr: np.ndarray) -> None:
+        Parameters
+        ----------
+        date
+        size_type
+        asset
+        size
+        fill_price
+        last_price
+        commission
+        date_diff
+        time_diff
+
+        """
+        _date: np.int64 = arr['date'][-1]
+        _size_type: int = arr['size_type'][-1]
+        _date_diff: bool = arr['date_diff'][-1]
+        _asset = arr['asset']
+
+        # 先执行交易
+        self.run_bar1(_date, _size_type, _asset, arr['size'], arr['fill_price'], arr['commission'])
+        # 更新最新价。浮动盈亏得到了调整
+        self.update_last_price(_asset, arr['last_price'])
+        # 每日收盘记录绩效
+        if _date_diff:
+            self.update_performances(_date)
+
+    def run_bar3(self,
+                 idx: np.ndarray,
+                 arr: np.ndarray) -> None:
+        """三层截面信号处理。分组遍历二层截面信号处理。
+
+        Parameters
+        ----------
+        idx
+        date
+        size_type
+        asset
+        size
+        fill_price
+        last_price
+        commission
+        date_diff
+        time_diff
+
+        """
         for i, j in zip(idx[:-1], idx[1:]):
-            a = arr[i:j]
-            self.run_bar2(a['date'][-1], a['size_type'][-1],
-                          a['asset'], a['size'], a['fill_price'], a['commission'], a['last_price'],
-                          a['date_diff'][-1])
+            self.run_bar2(arr[i:j])
 
     def __str__(self):
         # 这个要少调用，很慢
