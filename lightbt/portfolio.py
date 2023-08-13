@@ -320,12 +320,17 @@ class Portfolio:
         is_open: np.ndarray = np.sign(amount) * np.sign(size)
         is_open = np.where(is_open == 0, amount == 0, is_open > 0)
 
-        # 开仓用小数量，平仓用大数量。接近于0时自动调整为0
-        qty = np.abs(size) / self._positions_precision
-        # 10.2/0.2=50.99999999999999
-        qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9)) * self._positions_precision
-        # 原数字处理后会有小尾巴，简单处理一下
-        qty = np.round(qty, 9)
+        if self._positions_precision == 1.0:
+            # 提前条件判断，速度能快一些
+            qty = np.abs(size)
+            qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9))
+        else:
+            # 开仓用小数量，平仓用大数量。接近于0时自动调整为0
+            qty = np.abs(size) / self._positions_precision
+            # 10.2/0.2=50.99999999999999
+            qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9)) * self._positions_precision
+            # 原数字处理后会有小尾巴，简单处理一下
+            qty = np.round(qty, 9)
 
         # TODO: 是否要将反手拆分成两条？
         orders = np.empty(len(asset), dtype=order_inside_dt)
