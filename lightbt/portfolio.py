@@ -6,10 +6,11 @@ from numba.experimental import jitclass
 from numba.typed.typedlist import List
 
 from lightbt.enums import SizeType, order_inside_dt, trade_dt, position_dt, performance_dt
-from lightbt.position import Position
+from lightbt.position import Position, __TOL__
 
 
 class Portfolio:
+    _positions_precision: float
     _cash: float
 
     _idx_curr_trade: int
@@ -19,11 +20,18 @@ class Portfolio:
     _max_trades: int
     _max_performances: int
 
-    def __init__(self, max_trades: int = 1024, max_performances: int = 1024) -> None:
+    def __init__(self,
+                 positions_precision: float = 1.0,
+                 max_trades: int = 1024, max_performances: int = 1024) -> None:
         """初始化
 
         Parameters
         ----------
+        positions_precision: float
+            持仓精度
+                - 1.0 表示整数量
+                - 0.01 表示持仓可以精确到0.01，用于数字货币等场景
+                - 0.000001 精度高，相当于对持仓精度不做限制
         max_trades: int
             记录成交的缓存大小。空间不足时将丢弃
         max_performances: int
@@ -38,6 +46,8 @@ class Portfolio:
         self._trade_records = np.empty(max_trades, dtype=trade_dt)
         self._position_records = np.empty(1, dtype=position_dt)
         self._performance_records = np.empty(max_performances, dtype=performance_dt)
+
+        self._positions_precision = positions_precision
 
         self._cash = 0.0
 
@@ -304,22 +314,26 @@ class Portfolio:
             # 将市值转成手数
             size = size / (fill_price * mult)
             size_type = SizeType.Amount
-        if size_type == SizeType.Amount:
-            # 最后都汇总到此，手数是否调整？
-            pass
+        # if size_type == SizeType.Amount:
+        #     pass
+
+        is_open: np.ndarray = np.sign(amount) * np.sign(size)
+        is_open = np.where(is_open == 0, amount == 0, is_open > 0)
+
+        # 开仓用小数量，平仓用大数量
+        qty = np.abs(size) / self._positions_precision
+        qty = np.where(is_open, np.floor(qty), np.ceil(qty)) * self._positions_precision
+        # 原数字处理后会有小尾巴，简单处理一下
+        qty = np.round(qty, 9)
 
         # TODO: 是否要将反手拆分成两条？
         orders = np.empty(len(asset), dtype=order_inside_dt)
         orders['asset'][:] = asset
         orders['commission'][:] = commission
         orders['fill_price'][:] = fill_price
-        orders['size'][:] = size
-        orders['qty'][:] = np.abs(size)
+        orders['qty'][:] = qty
         orders['is_buy'][:] = size >= 0
-
-        is_open: np.ndarray = np.sign(amount) * np.sign(size)
-        orders['is_open'][:] = np.where(is_open == 0, amount == 0, is_open > 0)
-        orders['amount'][:] = amount
+        orders['is_open'][:] = is_open
 
         # 过滤无效操作
         return orders[orders['qty'] > 0]

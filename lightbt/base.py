@@ -11,22 +11,26 @@ from lightbt.utils import groupby_np
 
 class LightBT:
     def __init__(self,
-                 max_trades: int = 10000, max_performances: int = 10000,
-                 integer_positions: bool = False) -> None:
+                 positions_precision: float = 1.0,
+                 max_trades: int = 10000,
+                 max_performances: int = 10000,
+                 ) -> None:
         """初始化
 
         Parameters
         ----------
+        positions_precision: float
+            持仓精度
         max_trades: int
             记录成交的缓存大小。空间不足时将丢弃
         max_performances: int
             记录绩效的缓存大小。空间不足时将丢弃
-        integer_positions: bool
-            整数持仓
+
         """
         from lightbt.portfolio import Portfolio
 
-        self.pf = Portfolio(max_trades=max_trades, max_performances=max_performances)
+        self.pf = Portfolio(positions_precision=positions_precision,
+                            max_trades=max_trades, max_performances=max_performances)
         # 底层没有资产名字符串，只有纯数字
         self.mapping_asset_int = {}
         self.mapping_int_asset = {}

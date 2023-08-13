@@ -93,7 +93,5 @@ order_inside_dt = np.dtype([
     ('is_open', bool),
     ('fill_price', float),
     ('qty', float),
-    ('amount', float),
-    ('size', float),
     ('commission', float),
 ], align=True)

@@ -52,7 +52,8 @@ with Timer():
     print('warmup:', warmup())
 
 # %% 初始化
-bt = LightBT(max_trades=_N * _K, max_performances=_N * _K)
+bt = LightBT(positions_precision=1.0,
+             max_trades=_N * _K, max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
 

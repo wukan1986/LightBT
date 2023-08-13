@@ -4,6 +4,8 @@ import numpy as np
 from numba import objmode, types, njit
 from numba.experimental import jitclass
 
+__TOL__: float = 1e-6
+
 
 @njit(fastmath=True, nogil=True)
 def _value_with_mult(price: float, qty: float, mult: float) -> float:
@@ -33,7 +35,7 @@ def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
 
 
 @njit(fastmath=True, nogil=True)
-def _is_zero(x, tol=1e-6):
+def _is_zero(x, tol=__TOL__):
     """是否为0
 
     float，double分别遵循R32-24,R64-53的标准。
