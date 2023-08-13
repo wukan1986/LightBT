@@ -33,9 +33,13 @@ def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
 
 
 @njit(fastmath=True, nogil=True)
-def _is_zero(x, tol=1e-16):
-    """是否为0"""
-    return (x < tol) and (x > -tol)
+def _is_zero(x, tol=1e-6):
+    """是否为0
+
+    float，double分别遵循R32-24,R64-53的标准。
+    所以float的精度误差在1e-6；double精度误差在1e-15
+    """
+    return (x <= tol) and (x >= -tol)
 
 
 # 部分参考了SmartQuant部分代码，但又做了大量调整
@@ -314,6 +318,12 @@ class Position:
         self._pnls += self._pnl
         # 累计手续费
         self._commissions += self._commission
+
+        # 这几个值出现接近0时调整成0
+        # 有了这个调整后，回测速度反而加快
+        if _is_zero(self.Amount):
+            self.Amount = 0.0
+            self._margin = 0.0
 
     def _calculate_pnl(self, is_long: bool, avg_price: float, fill_price: float, qty: float, mult: float) -> float:
         """根据每笔成交计算盈亏。只有平仓才会调用此函数"""

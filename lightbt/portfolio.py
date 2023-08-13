@@ -40,7 +40,7 @@ class Portfolio:
         self._performance_records = np.empty(max_performances, dtype=performance_dt)
 
         self._cash = 0.0
-        
+
         self._idx_curr_trade = 0
         self._idx_curr_performance = 0
         self._idx_last_trade = 0

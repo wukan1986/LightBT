@@ -17,7 +17,7 @@ pd.options.plotting.backend = 'plotly'
 
 # %%
 _N = 365 * 10  # 10年
-_K = 5000  # 2000支股票
+_K = 5000  # 5000支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range('2000-01-1', periods=_N)
