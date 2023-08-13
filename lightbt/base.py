@@ -124,8 +124,12 @@ class LightBT:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def run_bar(self, arrs) -> None:
-        """可按指定设置更新数据"""
+    def run_bar(self, arr) -> None:
+        """同一时点，截面所有资产立即执行"""
+        self.pf.run_bar2(arr)
+
+    def run_bars(self, arrs) -> None:
+        """多时点，循序分批执行"""
         for arr in arrs:
             self.pf.run_bar2(arr)
 
@@ -166,9 +170,10 @@ def warmup() -> float:
 
     bt = LightBT()
     bt.setup(conf)
-    bt.pf.deposit(10000 * 50)
+    bt.deposit(10000 * 50)
+    bt.withdraw(10000 * 10)
 
-    bt.run_bar(groupby_np(orders_daily(df, bt.mapping_asset_int), by='time_diff', dtype=order_outside_dt))
+    bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
 
     bt.trades()
     bt.positions()

@@ -351,7 +351,6 @@ class Portfolio:
             - last_price
             - commission
             - date_diff
-            - time_diff
 
         """
         _date: np.int64 = arr['date'][-1]

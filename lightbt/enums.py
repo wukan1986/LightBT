@@ -84,7 +84,6 @@ order_outside_dt = np.dtype([
     ('last_price', float),
     ('commission', float),
     ('date_diff', bool),  # 标记换日，会触发绩效更新
-    ('time_diff', bool),  # 标记同时间截面，用于时序分组
 ], align=True)
 
 # 内部下单指令。用于将上层的目标持仓等信息转换成实际下单指令

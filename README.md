@@ -71,7 +71,7 @@ with Timer():
 
 # %% 交易
 with Timer():
-    bt.run_bar(*orders_to_array(orders_daily(df, bt.mapping_asset_int)))
+    bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
 
 # %% 查看最终持仓
 positions = bt.positions()
