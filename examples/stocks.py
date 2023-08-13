@@ -17,7 +17,7 @@ pd.options.plotting.backend = 'plotly'
 
 # %%
 _N = 365 * 10  # 10年
-_K = 2000  # 2000支股票
+_K = 5000  # 2000支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range('2000-01-1', periods=_N)
@@ -68,10 +68,10 @@ with Timer():
 positions = bt.positions()
 print(positions)
 # %% 查看所有交易记录
-trades = bt.trades()
+trades = bt.trades(all=True)
 print(trades)
 # %% 查看绩效
-perf = bt.performances()
+perf = bt.performances(all=True)
 print(perf)
 # %% 总体绩效
 equity = total_equity(perf)

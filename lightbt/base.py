@@ -101,14 +101,6 @@ class LightBT:
         """出金"""
         return self.pf.withdraw(cash)
 
-    def trades(self, convert_asset: bool = True) -> pd.DataFrame:
-        """成交记录"""
-        df = pd.DataFrame.from_records(self.pf.trades())
-        df['date'] = pd.to_datetime(df['date'])
-        if convert_asset:
-            df['asset'] = df['asset'].map(self.mapping_int_asset)
-        return df
-
     def positions(self, convert_asset: bool = True) -> pd.DataFrame:
         """持仓记录"""
         df = pd.DataFrame.from_records(self.pf.positions())
@@ -116,9 +108,17 @@ class LightBT:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def performances(self, convert_asset: bool = False) -> pd.DataFrame:
+    def trades(self, all: bool, convert_asset: bool = True) -> pd.DataFrame:
+        """成交记录"""
+        df = pd.DataFrame.from_records(self.pf.trades(all))
+        df['date'] = pd.to_datetime(df['date'])
+        if convert_asset:
+            df['asset'] = df['asset'].map(self.mapping_int_asset)
+        return df
+
+    def performances(self, all: bool, convert_asset: bool = False) -> pd.DataFrame:
         """持仓记录"""
-        df = pd.DataFrame.from_records(self.pf.performances())
+        df = pd.DataFrame.from_records(self.pf.performances(all))
         df['date'] = pd.to_datetime(df['date'])
         if convert_asset:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
@@ -175,9 +175,9 @@ def warmup() -> float:
 
     bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
 
-    bt.trades()
     bt.positions()
-    bt.performances()
+    bt.trades(all=True)
+    bt.performances(all=True)
 
     toc = time.perf_counter()
     return toc - tic

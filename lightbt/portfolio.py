@@ -11,8 +11,11 @@ from lightbt.position import Position
 
 class Portfolio:
     _cash: float
-    _idx_trade: int
-    _idx_performance: int
+
+    _idx_curr_trade: int
+    _idx_curr_performance: int
+    _idx_last_trade: int
+    _idx_last_performance: int
     _max_trades: int
     _max_performances: int
 
@@ -37,14 +40,19 @@ class Portfolio:
         self._performance_records = np.empty(max_performances, dtype=performance_dt)
 
         self._cash = 0.0
-        self._idx_trade = 0
-        self._idx_performance = 0
+        
+        self._idx_curr_trade = 0
+        self._idx_curr_performance = 0
+        self._idx_last_trade = 0
+        self._idx_last_performance = 0
         self._max_trades = max_trades
         self._max_performances = max_performances
 
     def reset(self):
-        self._idx_trade = 0
-        self._idx_performance = 0
+        self._idx_curr_trade = 0
+        self._idx_curr_performance = 0
+        self._idx_last_trade = 0
+        self._idx_last_performance = 0
 
     @property
     def Cash(self) -> float:
@@ -126,13 +134,13 @@ class Portfolio:
                            date: np.int64, asset: int,
                            is_buy: bool, is_open: bool, fill_price: float, qty: float) -> None:
         """遇到有效成交时自动更新，所以内容直接取即可"""
-        if self._idx_trade >= self._max_trades:
+        if self._idx_curr_trade >= self._max_trades:
             return
-        rec = self._trade_records[self._idx_trade]
+        rec = self._trade_records[self._idx_curr_trade]
 
         self._positions[asset].to_record_trade(rec, date, is_buy, is_open, fill_price, qty, self._cash)
 
-        self._idx_trade += 1
+        self._idx_curr_trade += 1
 
     def _fill_position_records(self, detail: bool) -> None:
         """更新持仓记录"""
@@ -152,14 +160,16 @@ class Portfolio:
     def update_performances(self, date: np.int64) -> None:
         """更新绩效"""
         cash: float = self._cash
+        # 上次的位置
+        self._idx_last_performance = self._idx_curr_performance
         for i, pos in enumerate(self._positions):
-            if self._idx_performance >= self._max_performances:
+            if self._idx_curr_performance >= self._max_performances:
                 return
 
-            rec = self._performance_records[self._idx_performance]
+            rec = self._performance_records[self._idx_curr_performance]
             pos.to_record_performance(rec, date, cash)
 
-            self._idx_performance += 1
+            self._idx_curr_performance += 1
 
     def update(self, date: np.int64, asset: np.ndarray, last_price: np.ndarray, do_settlement: bool) -> None:
         """更新价格。记录绩效
@@ -186,13 +196,19 @@ class Portfolio:
         for i, pos in enumerate(self._positions):
             pos.settlement()
 
-    def performances(self) -> np.ndarray:
+    def performances(self, all: bool) -> np.ndarray:
         """绩效记录"""
-        return self._performance_records[:self._idx_performance]
+        if all:
+            return self._performance_records[:self._idx_curr_performance]
+        else:
+            return self._performance_records[self._idx_last_performance:self._idx_curr_performance]
 
-    def trades(self) -> np.ndarray:
+    def trades(self, all: bool) -> np.ndarray:
         """很多变量只记录了瞬时值，当需要时序值时，通过此函数记录下来备用"""
-        return self._trade_records[:self._idx_trade]
+        if all:
+            return self._trade_records[:self._idx_curr_trade]
+        else:
+            return self._trade_records[self._idx_last_trade:self._idx_curr_trade]
 
     def positions(self) -> np.ndarray:
         """最新持仓记录"""
@@ -324,6 +340,9 @@ class Portfolio:
 
         """
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price, commission)
+
+        # 记录上次位置
+        self._idx_last_trade = self._idx_curr_trade
 
         # 先平仓
         orders_close = orders[~orders['is_open']]
