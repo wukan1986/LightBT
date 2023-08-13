@@ -6,7 +6,7 @@ from numba.experimental import jitclass
 from numba.typed.typedlist import List
 
 from lightbt.enums import SizeType, order_inside_dt, trade_dt, position_dt, performance_dt
-from lightbt.position import Position, __TOL__
+from lightbt.position import Position
 
 
 class Portfolio:
@@ -320,9 +320,10 @@ class Portfolio:
         is_open: np.ndarray = np.sign(amount) * np.sign(size)
         is_open = np.where(is_open == 0, amount == 0, is_open > 0)
 
-        # 开仓用小数量，平仓用大数量
+        # 开仓用小数量，平仓用大数量。接近于0时自动调整为0
         qty = np.abs(size) / self._positions_precision
-        qty = np.where(is_open, np.floor(qty), np.ceil(qty)) * self._positions_precision
+        # 10.2/0.2=50.99999999999999
+        qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9)) * self._positions_precision
         # 原数字处理后会有小尾巴，简单处理一下
         qty = np.round(qty, 9)
 
