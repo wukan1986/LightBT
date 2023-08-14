@@ -49,20 +49,21 @@ class Portfolio:
 
         self._positions_precision = positions_precision
 
+        self._max_trades = max_trades
+        self._max_performances = max_performances
+
+        self.reset()
+
+    def reset(self):
         self._cash = 0.0
 
         self._idx_curr_trade = 0
         self._idx_curr_performance = 0
         self._idx_last_trade = 0
         self._idx_last_performance = 0
-        self._max_trades = max_trades
-        self._max_performances = max_performances
 
-    def reset(self):
-        self._idx_curr_trade = 0
-        self._idx_curr_performance = 0
-        self._idx_last_trade = 0
-        self._idx_last_performance = 0
+        for p in self._positions:
+            p.reset()
 
     @property
     def Cash(self) -> float:
@@ -265,7 +266,18 @@ class Portfolio:
         return True
 
     def convert_size(self, size_type: int, asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> np.ndarray:
+        """交易数量转换
 
+        Parameters
+        ----------
+        size_type
+        asset
+        size: float
+            nan时表示不交易
+        fill_price
+        commission
+
+        """
         self._fill_position_records(False)
         # asset不能出现重复
         _rs: np.ndarray = self._position_records[asset]
@@ -273,15 +285,16 @@ class Portfolio:
         amount: np.ndarray = _rs['amount']
         mult: np.ndarray = _rs['mult']
 
+        # 以下的操作size为nan时最终还是nan, 所以可以用来标记只更新最新价
         if size_type == SizeType.TargetPercentMargin:
             # 总权益转分别使用保证金再转市值
-            _equity: float = self.Equity * np.sum(np.abs(size))
+            _equity: float = self.Equity * np.nansum(np.abs(size))
             size = _equity * size / margin_ratio
             size_type = SizeType.TargetValue
         if size_type == SizeType.TargetPercentValue:
             # 总权益除保证金率占比，得到总市值，然后得到分别市值
-            _equity: float = self.Equity * np.sum(np.abs(size))
-            _ratio: float = np.sum((np.abs(size) * margin_ratio))
+            _equity: float = self.Equity * np.nansum(np.abs(size))
+            _ratio: float = np.nansum((np.abs(size) * margin_ratio))
             if _ratio == 0:
                 size = _equity * size
             else:
@@ -341,7 +354,7 @@ class Portfolio:
         orders['is_buy'][:] = size >= 0
         orders['is_open'][:] = is_open
 
-        # 过滤无效操作
+        # 过滤无效操作。nan正好也被过滤了不会下单
         return orders[orders['qty'] > 0]
 
     def run_bar1(self,

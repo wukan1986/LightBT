@@ -11,6 +11,7 @@ from lightbt.utils import groupby_np
 
 class LightBT:
     def __init__(self,
+                 init_cash: float = 10000,
                  positions_precision: float = 1.0,
                  max_trades: int = 10000,
                  max_performances: int = 10000,
@@ -29,12 +30,27 @@ class LightBT:
         """
         from lightbt.portfolio import Portfolio
 
-        self.pf = Portfolio(positions_precision=positions_precision,
-                            max_trades=max_trades, max_performances=max_performances)
+        self._init_cash = init_cash
+        self._positions_precision = positions_precision
+        self._max_trades = max_trades
+        self._max_performances = max_performances
+
+        self.pf = Portfolio(positions_precision=self._positions_precision,
+                            max_trades=self._max_trades,
+                            max_performances=self._max_performances)
+        # 入金
+        self.deposit(self._init_cash)
+
         # 底层没有资产名字符串，只有纯数字
         self.mapping_asset_int = {}
         self.mapping_int_asset = {}
         self.conf: pd.DataFrame = pd.DataFrame()
+
+    def reset(self):
+        """重置。不需要再次`setup`，只需要重新跑一次`run_`即可"""
+        self.pf.reset()
+        # 入金
+        self.deposit(self._init_cash)
 
     def setup(self, df: pd.DataFrame) -> None:
         """映射资产，配置合约乘数和保证金率
@@ -129,11 +145,41 @@ class LightBT:
         return df
 
     def run_bar(self, arr) -> None:
-        """同一时点，截面所有资产立即执行"""
+        """同一时点，截面所有资产立即执行
+
+        Parameters
+        ----------
+        arr
+            - date
+            - size_type
+            - asset
+            - size
+                nan可用于只更新价格但不交易
+            - fill_price
+            - last_price
+            - commission
+            - date_diff
+
+        """
         self.pf.run_bar2(arr)
 
     def run_bars(self, arrs) -> None:
-        """多时点，循序分批执行"""
+        """多时点，循序分批执行
+
+        Parameters
+        ----------
+        arrs
+            - date
+            - size_type
+            - asset
+            - size:
+                nan可用于只更新价格但不交易
+            - fill_price
+            - last_price
+            - commission
+            - date_diff
+
+        """
         for arr in arrs:
             self.pf.run_bar2(arr)
 
@@ -172,9 +218,8 @@ def warmup() -> float:
 
     tic = time.perf_counter()
 
-    bt = LightBT()
+    bt = LightBT(init_cash=10000 * 50)
     bt.setup(conf)
-    bt.deposit(10000 * 50)
     bt.withdraw(10000 * 10)
 
     bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
@@ -182,6 +227,7 @@ def warmup() -> float:
     bt.positions()
     bt.trades(all=True)
     bt.performances(all=True)
+    bt.reset()
 
     toc = time.perf_counter()
     return toc - tic

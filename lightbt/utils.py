@@ -60,7 +60,7 @@ def groupby_np(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
         # recarray转np.ndarray
         arr = np.asarray(df.to_records(index=False), dtype=dtype)
     else:
-        arr = df
+        arr = df.copy()
 
     idx = np.argwhere(time_diff)
     idx = np.append(idx, [len(arr)])

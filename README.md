@@ -89,6 +89,24 @@ equity.plot()
 
 ```
 
+## 输入格式
+1. date: int64
+    时间日期。需在外部提前转成数字。可用`astype(np.int64)`或`to_records(dtype)`等方法来实现
+2. size_type: int
+    数量类型。参考`lightbt.enums.SizeType`
+3. asset: int
+    资产ID。由`LightBT.setup`执行结果所确定。可通过`LightBT.asset_str2int`和`LightBT.asset_int2str`进行相互转换
+4. size: float
+    数量。具体含义需根据`size_type`决定。`nan`是一特殊值。用来表示当前一行不交易。在只更新最新价的需求中将频繁用到。
+5. fill_price: float
+    成交价。成交价不等于最新价也不等于收盘价。可以用成交均价等一些有意义的价格进行代替。
+6. last_price: float
+    最新价。可用收盘价、结算价等代替。它影响持仓的浮动盈亏。所以在对绩效快照前一定要更新一次
+7. commission: float
+    手续费
+8. date_diff: bool
+    是否换日。在换日的最后时刻需要更新最新价和记录绩效
+
 ## 二次开发
 ```commandline
 git --clone https://github.com/wukan1986/LightBT.git

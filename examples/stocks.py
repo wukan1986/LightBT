@@ -86,8 +86,11 @@ print(pnls)
 pnls.plot()
 
 # %% 单个资产的绩效细节
-tmp = df[['date', 'asset', 'CLOSE']].set_index(['date', 'asset'])
-pnls = pnl_by_asset(perf, bt.asset_str2int(['s_0000']), tmp)
+tmp = df[['date', 'asset', 'CLOSE']].copy()
+tmp['asset'] = tmp['asset'].map(bt.mapping_asset_int)
+pnls = pnl_by_asset(perf,
+                    bt.asset_str2int(['s_0000']),
+                    tmp.set_index(['date', 'asset']))
 print(pnls)
 pnls.plot()
 # %%

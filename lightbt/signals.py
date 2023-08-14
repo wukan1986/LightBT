@@ -3,6 +3,9 @@ import pandas as pd
 
 def orders_daily(df: pd.DataFrame, mapping_asset_int: dict) -> pd.DataFrame:
     """"""
+    # 之后会改变原数据，所以这里复制一下
+    df = df.copy()
+
     # 这一步比较慢，是否能再提速
     df['asset'] = df['asset'].map(mapping_asset_int)
 

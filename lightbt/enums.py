@@ -79,7 +79,7 @@ order_outside_dt = np.dtype([
     ('date', np.int64),
     ('size_type', int),
     ('asset', int),
-    ('size', float),
+    ('size', float),  # nan时表示此行不参与交易。可用于有持仓但不交易的资产更新最新价
     ('fill_price', float),
     ('last_price', float),
     ('commission', float),

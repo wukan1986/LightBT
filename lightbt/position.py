@@ -98,12 +98,15 @@ class Position:
             预设的资产顺序ID
         """
         self.Asset = asset
-        self.LongQty = 0.0
-        self.ShortQty = 0.0
 
         self._mult = 1.0
         self._margin_ratio = 1.0
 
+        self.reset()
+
+    def reset(self):
+        self.LongQty = 0.0
+        self.ShortQty = 0.0
         self.LastPrice = 0.0
         self.Amount = 0.0
         self.QtyBought = 0.0
