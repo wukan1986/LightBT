@@ -28,7 +28,7 @@ class Timer:
         print(f"code executed in {end_time - self.start_time} seconds")
 
 
-def groupby_np(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
+def groupby(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
     """简版数据分组
 
     Parameters
@@ -52,17 +52,21 @@ def groupby_np(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
     df = df[list(dtype.names)]
 
     if isinstance(df, pd.DataFrame):
-        # 按日期时间标记，每段的第一天标记为True
-        time_0 = df[by]
-        time_1 = time_0.shift(1)
-        time_diff = (time_0 != time_1).to_numpy()
-
         # recarray转np.ndarray
         arr = np.asarray(df.to_records(index=False), dtype=dtype)
-    else:
-        arr = df.copy()
 
-    idx = np.argwhere(time_diff)
-    idx = np.append(idx, [len(arr)])
+        # 这里支持复合分组
+        idx = df.groupby(by=by)['asset'].count().cumsum().to_numpy()
+        idx = np.insert(idx, 0, 0)
+    else:
+        # 原数据是否需要复制？从代码上看没有复制之处
+        arr = df  # .copy()
+
+        dt = arr[by]
+        flag = np.ones(shape=len(dt) + 1, dtype=bool)
+        # 前后都为True
+        flag[1:-1] = dt[:-1] != dt[1:]
+        idx = np.argwhere(flag)
+
     for i, j in zip(idx[:-1], idx[1:]):
         yield arr[i:j]

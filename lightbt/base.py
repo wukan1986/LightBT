@@ -6,7 +6,7 @@ import pandas as pd
 
 from lightbt.enums import order_outside_dt
 from lightbt.signals import orders_daily
-from lightbt.utils import groupby_np
+from lightbt.utils import groupby
 
 
 class LightBT:
@@ -199,7 +199,7 @@ def warmup() -> float:
     conf = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio'])
 
     df1 = pd.DataFrame({'asset': ['510300', 'IF2309'],
-                        'size': [0.5, -0.5],
+                        'size': [np.nan, -0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-01',
@@ -219,10 +219,14 @@ def warmup() -> float:
     tic = time.perf_counter()
 
     bt = LightBT(init_cash=10000 * 50)
-    bt.setup(conf)
+    bt.deposit(10000 * 20)
     bt.withdraw(10000 * 10)
 
-    bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
+    bt.setup(conf)
+    # 只能在setup后才能做map
+    df['asset'] = df['asset'].map(bt.mapping_asset_int)
+
+    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
 
     bt.positions()
     bt.trades(all=True)

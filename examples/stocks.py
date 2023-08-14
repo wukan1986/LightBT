@@ -9,7 +9,7 @@ from lightbt import LightBT, warmup
 from lightbt.enums import SizeType, order_outside_dt
 from lightbt.signals import orders_daily
 from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
-from lightbt.utils import Timer, groupby_np
+from lightbt.utils import Timer, groupby
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
@@ -52,8 +52,10 @@ with Timer():
     print('warmup:', warmup())
 
 # %% 初始化
-bt = LightBT(positions_precision=1.0,
-             max_trades=_N * _K, max_performances=_N * _K)
+bt = LightBT(init_cash=0.0,
+             positions_precision=1.0,
+             max_trades=_N * _K,
+             max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
 
@@ -61,9 +63,12 @@ bt.deposit(10000 * 100)
 with Timer():
     bt.setup(conf)
 
+# %% 资产转换，只做一次即可
+df['asset'] = df['asset'].map(bt.mapping_asset_int)
+
 # %% 交易
 with Timer():
-    bt.run_bars(groupby_np(orders_daily(df, bt.mapping_asset_int), by='date', dtype=order_outside_dt))
+    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
 
 # %% 查看最终持仓
 positions = bt.positions()
@@ -86,14 +91,12 @@ print(pnls)
 pnls.plot()
 
 # %% 单个资产的绩效细节
-tmp = df[['date', 'asset', 'CLOSE']].copy()
-tmp['asset'] = tmp['asset'].map(bt.mapping_asset_int)
-pnls = pnl_by_asset(perf,
-                    bt.asset_str2int(['s_0000']),
-                    tmp.set_index(['date', 'asset']))
+tmp = df[['date', 'asset', 'CLOSE']].set_index(['date', 'asset'])
+pnls = pnl_by_asset(perf, bt.asset_str2int(['s_0000']), tmp)
 print(pnls)
 pnls.plot()
 # %%
 pd.options.plotting.backend = 'matplotlib'
 pnls[['PnL', 'CLOSE']].plot(secondary_y='CLOSE')
 # %%
+print(df)

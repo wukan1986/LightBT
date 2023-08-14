@@ -1,18 +1,28 @@
 import pandas as pd
 
 
-def orders_daily(df: pd.DataFrame, mapping_asset_int: dict) -> pd.DataFrame:
-    """"""
-    # 之后会改变原数据，所以这里复制一下
-    df = df.copy()
+def orders_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """
 
-    # 这一步比较慢，是否能再提速
-    df['asset'] = df['asset'].map(mapping_asset_int)
+    Parameters
+    ----------
+    df
 
-    # TODO: !!! 提前排序，之后就可以直接使用
-    df.sort_values(by=['date'], inplace=True)
+    Returns
+    -------
+    pd.DataFrame
+        1. 已经按时间进行了排序。sort_values
+        2. 添加了日期标记，用于触发内部的绩效快照
 
-    # 按日期标记，每段的最后一条标记为True
+    Notes
+    -----
+    有多处修改了数据，所以需要`copy`。`sort_values`隐含了`copy`
+
+    """
+    # 全体数据排序，并复制
+    df = df.sort_values(by=['date'])
+
+    # 按日期标记，每段的最后一条标记为True。一定要提前排序
     date_0 = df['date'].dt.date
     df['date_diff'] = date_0 != date_0.shift(-1)
 
