@@ -5,30 +5,52 @@ import numpy as np
 import pandas as pd
 
 from lightbt.enums import order_outside_dt
+from lightbt.signals import orders_daily
+from lightbt.utils import groupby
 
 
 class LightBT:
     def __init__(self,
-                 max_trades: int = 10000, max_performances: int = 10000,
-                 integer_positions: bool = False) -> None:
+                 init_cash: float = 10000,
+                 positions_precision: float = 1.0,
+                 max_trades: int = 10000,
+                 max_performances: int = 10000,
+                 ) -> None:
         """初始化
 
         Parameters
         ----------
+        positions_precision: float
+            持仓精度
         max_trades: int
             记录成交的缓存大小。空间不足时将丢弃
         max_performances: int
             记录绩效的缓存大小。空间不足时将丢弃
-        integer_positions: bool
-            整数持仓
+
         """
         from lightbt.portfolio import Portfolio
 
-        self.pf = Portfolio(max_trades=max_trades, max_performances=max_performances)
+        self._init_cash = init_cash
+        self._positions_precision = positions_precision
+        self._max_trades = max_trades
+        self._max_performances = max_performances
+
+        self.pf = Portfolio(positions_precision=self._positions_precision,
+                            max_trades=self._max_trades,
+                            max_performances=self._max_performances)
+        # 入金
+        self.deposit(self._init_cash)
+
         # 底层没有资产名字符串，只有纯数字
         self.mapping_asset_int = {}
         self.mapping_int_asset = {}
         self.conf: pd.DataFrame = pd.DataFrame()
+
+    def reset(self):
+        """重置。不需要再次`setup`，只需要重新跑一次`run_`即可"""
+        self.pf.reset()
+        # 入金
+        self.deposit(self._init_cash)
 
     def setup(self, df: pd.DataFrame) -> None:
         """映射资产，配置合约乘数和保证金率
@@ -99,14 +121,6 @@ class LightBT:
         """出金"""
         return self.pf.withdraw(cash)
 
-    def trades(self, convert_asset: bool = True) -> pd.DataFrame:
-        """成交记录"""
-        df = pd.DataFrame.from_records(self.pf.trades())
-        df['date'] = pd.to_datetime(df['date'])
-        if convert_asset:
-            df['asset'] = df['asset'].map(self.mapping_int_asset)
-        return df
-
     def positions(self, convert_asset: bool = True) -> pd.DataFrame:
         """持仓记录"""
         df = pd.DataFrame.from_records(self.pf.positions())
@@ -114,46 +128,60 @@ class LightBT:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def performances(self, convert_asset: bool = False) -> pd.DataFrame:
-        """持仓记录"""
-        df = pd.DataFrame.from_records(self.pf.performances())
+    def trades(self, all: bool, convert_asset: bool = True) -> pd.DataFrame:
+        """成交记录"""
+        df = pd.DataFrame.from_records(self.pf.trades(all))
         df['date'] = pd.to_datetime(df['date'])
         if convert_asset:
             df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def run_all(self, df: pd.DataFrame) -> None:
-        """整体运行策略。适合策略回测场景
+    def performances(self, all: bool, convert_asset: bool = False) -> pd.DataFrame:
+        """持仓记录"""
+        df = pd.DataFrame.from_records(self.pf.performances(all))
+        df['date'] = pd.to_datetime(df['date'])
+        if convert_asset:
+            df['asset'] = df['asset'].map(self.mapping_int_asset)
+        return df
+
+    def run_bar(self, arr) -> None:
+        """同一时点，截面所有资产立即执行
 
         Parameters
         ----------
-        df: pd.DataFrame
+        arr
             - date
             - size_type
             - asset
             - size
+                nan可用于只更新价格但不交易
             - fill_price
             - last_price
+            - commission
+            - date_diff
 
         """
-        # 这一步比较慢，是否能再提速
-        df['asset'] = df['asset'].map(self.mapping_asset_int)
+        self.pf.run_bar2(arr)
 
-        # 提前排序，之后就可以直接使用
-        df.sort_values(by=['date'], inplace=True)
+    def run_bars(self, arrs) -> None:
+        """多时点，循序分批执行
 
-        # 按日期标记，每段的最后一天标记为True
-        date_0 = df['date'].dt.date
-        df['date_diff'] = date_0 != date_0.shift(-1)
-        # 按日期时间标记，每段的第一天标记为True
-        time_0 = df['date']
-        df['time_diff'] = time_0 != time_0.shift(1)
+        Parameters
+        ----------
+        arrs
+            - date
+            - size_type
+            - asset
+            - size:
+                nan可用于只更新价格但不交易
+            - fill_price
+            - last_price
+            - commission
+            - date_diff
 
-        arr = np.asarray(df[list(order_outside_dt.names)].to_records(index=False), dtype=order_outside_dt)
-        idx = np.argwhere(arr['time_diff']).reshape(-1)
-        idx = np.append(idx, [len(arr)])
-
-        self.pf.run_bar3(idx, arr)
+        """
+        for arr in arrs:
+            self.pf.run_bar2(arr)
 
 
 def warmup() -> float:
@@ -171,7 +199,7 @@ def warmup() -> float:
     conf = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio'])
 
     df1 = pd.DataFrame({'asset': ['510300', 'IF2309'],
-                        'size': [0.5, -0.5],
+                        'size': [np.nan, -0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-01',
@@ -190,14 +218,20 @@ def warmup() -> float:
 
     tic = time.perf_counter()
 
-    bt = LightBT()
-    bt.setup(conf)
-    bt.pf.deposit(10000 * 50)
-    bt.run_all(df)
+    bt = LightBT(init_cash=10000 * 50)
+    bt.deposit(10000 * 20)
+    bt.withdraw(10000 * 10)
 
-    bt.trades()
+    bt.setup(conf)
+    # 只能在setup后才能做map
+    df['asset'] = df['asset'].map(bt.mapping_asset_int)
+
+    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
+
     bt.positions()
-    bt.performances()
+    bt.trades(all=True)
+    bt.performances(all=True)
+    bt.reset()
 
     toc = time.perf_counter()
     return toc - tic

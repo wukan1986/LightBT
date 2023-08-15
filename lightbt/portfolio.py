@@ -10,17 +10,28 @@ from lightbt.position import Position
 
 
 class Portfolio:
+    _positions_precision: float
     _cash: float
-    _idx_trade: int
-    _idx_performance: int
+
+    _idx_curr_trade: int
+    _idx_curr_performance: int
+    _idx_last_trade: int
+    _idx_last_performance: int
     _max_trades: int
     _max_performances: int
 
-    def __init__(self, max_trades: int = 1024, max_performances: int = 1024) -> None:
+    def __init__(self,
+                 positions_precision: float = 1.0,
+                 max_trades: int = 1024, max_performances: int = 1024) -> None:
         """初始化
 
         Parameters
         ----------
+        positions_precision: float
+            持仓精度
+                - 1.0 表示整数量
+                - 0.01 表示持仓可以精确到0.01，用于数字货币等场景
+                - 0.000001 精度高，相当于对持仓精度不做限制
         max_trades: int
             记录成交的缓存大小。空间不足时将丢弃
         max_performances: int
@@ -36,15 +47,23 @@ class Portfolio:
         self._position_records = np.empty(1, dtype=position_dt)
         self._performance_records = np.empty(max_performances, dtype=performance_dt)
 
-        self._cash = 0.0
-        self._idx_trade = 0
-        self._idx_performance = 0
+        self._positions_precision = positions_precision
+
         self._max_trades = max_trades
         self._max_performances = max_performances
 
+        self.reset()
+
     def reset(self):
-        self._idx_trade = 0
-        self._idx_performance = 0
+        self._cash = 0.0
+
+        self._idx_curr_trade = 0
+        self._idx_curr_performance = 0
+        self._idx_last_trade = 0
+        self._idx_last_performance = 0
+
+        for p in self._positions:
+            p.reset()
 
     @property
     def Cash(self) -> float:
@@ -126,13 +145,13 @@ class Portfolio:
                            date: np.int64, asset: int,
                            is_buy: bool, is_open: bool, fill_price: float, qty: float) -> None:
         """遇到有效成交时自动更新，所以内容直接取即可"""
-        if self._idx_trade >= self._max_trades:
+        if self._idx_curr_trade >= self._max_trades:
             return
-        rec = self._trade_records[self._idx_trade]
+        rec = self._trade_records[self._idx_curr_trade]
 
         self._positions[asset].to_record_trade(rec, date, is_buy, is_open, fill_price, qty, self._cash)
 
-        self._idx_trade += 1
+        self._idx_curr_trade += 1
 
     def _fill_position_records(self, detail: bool) -> None:
         """更新持仓记录"""
@@ -152,14 +171,16 @@ class Portfolio:
     def update_performances(self, date: np.int64) -> None:
         """更新绩效"""
         cash: float = self._cash
+        # 上次的位置
+        self._idx_last_performance = self._idx_curr_performance
         for i, pos in enumerate(self._positions):
-            if self._idx_performance >= self._max_performances:
+            if self._idx_curr_performance >= self._max_performances:
                 return
 
-            rec = self._performance_records[self._idx_performance]
+            rec = self._performance_records[self._idx_curr_performance]
             pos.to_record_performance(rec, date, cash)
 
-            self._idx_performance += 1
+            self._idx_curr_performance += 1
 
     def update(self, date: np.int64, asset: np.ndarray, last_price: np.ndarray, do_settlement: bool) -> None:
         """更新价格。记录绩效
@@ -186,13 +207,19 @@ class Portfolio:
         for i, pos in enumerate(self._positions):
             pos.settlement()
 
-    def performances(self) -> np.ndarray:
+    def performances(self, all: bool) -> np.ndarray:
         """绩效记录"""
-        return self._performance_records[:self._idx_performance]
+        if all:
+            return self._performance_records[:self._idx_curr_performance]
+        else:
+            return self._performance_records[self._idx_last_performance:self._idx_curr_performance]
 
-    def trades(self) -> np.ndarray:
+    def trades(self, all: bool) -> np.ndarray:
         """很多变量只记录了瞬时值，当需要时序值时，通过此函数记录下来备用"""
-        return self._trade_records[:self._idx_trade]
+        if all:
+            return self._trade_records[:self._idx_curr_trade]
+        else:
+            return self._trade_records[self._idx_last_trade:self._idx_curr_trade]
 
     def positions(self) -> np.ndarray:
         """最新持仓记录"""
@@ -239,7 +266,18 @@ class Portfolio:
         return True
 
     def convert_size(self, size_type: int, asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> np.ndarray:
+        """交易数量转换
 
+        Parameters
+        ----------
+        size_type
+        asset
+        size: float
+            nan时表示不交易
+        fill_price
+        commission
+
+        """
         self._fill_position_records(False)
         # asset不能出现重复
         _rs: np.ndarray = self._position_records[asset]
@@ -247,15 +285,16 @@ class Portfolio:
         amount: np.ndarray = _rs['amount']
         mult: np.ndarray = _rs['mult']
 
+        # 以下的操作size为nan时最终还是nan, 所以可以用来标记只更新最新价
         if size_type == SizeType.TargetPercentMargin:
             # 总权益转分别使用保证金再转市值
-            _equity: float = self.Equity * np.sum(np.abs(size))
+            _equity: float = self.Equity * np.nansum(np.abs(size))
             size = _equity * size / margin_ratio
             size_type = SizeType.TargetValue
         if size_type == SizeType.TargetPercentValue:
             # 总权益除保证金率占比，得到总市值，然后得到分别市值
-            _equity: float = self.Equity * np.sum(np.abs(size))
-            _ratio: float = np.sum((np.abs(size) * margin_ratio))
+            _equity: float = self.Equity * np.nansum(np.abs(size))
+            _ratio: float = np.nansum((np.abs(size) * margin_ratio))
             if _ratio == 0:
                 size = _equity * size
             else:
@@ -288,31 +327,55 @@ class Portfolio:
             # 将市值转成手数
             size = size / (fill_price * mult)
             size_type = SizeType.Amount
-        if size_type == SizeType.Amount:
-            # 最后都汇总到此，手数是否调整？
-            pass
+        # if size_type == SizeType.Amount:
+        #     pass
+
+        is_open: np.ndarray = np.sign(amount) * np.sign(size)
+        is_open = np.where(is_open == 0, amount == 0, is_open > 0)
+
+        if self._positions_precision == 1.0:
+            # 提前条件判断，速度能快一些
+            qty = np.abs(size)
+            qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9))
+        else:
+            # 开仓用小数量，平仓用大数量。接近于0时自动调整为0
+            qty = np.abs(size) / self._positions_precision
+            # 10.2/0.2=50.99999999999999
+            qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9)) * self._positions_precision
+            # 原数字处理后会有小尾巴，简单处理一下
+            qty = np.round(qty, 9)
 
         # TODO: 是否要将反手拆分成两条？
         orders = np.empty(len(asset), dtype=order_inside_dt)
         orders['asset'][:] = asset
         orders['commission'][:] = commission
         orders['fill_price'][:] = fill_price
-        orders['size'][:] = size
-        orders['qty'][:] = np.abs(size)
+        orders['qty'][:] = qty
         orders['is_buy'][:] = size >= 0
+        orders['is_open'][:] = is_open
 
-        is_open: np.ndarray = np.sign(amount) * np.sign(size)
-        orders['is_open'][:] = np.where(is_open == 0, amount == 0, is_open > 0)
-        orders['amount'][:] = amount
-
-        # 过滤无效操作
+        # 过滤无效操作。nan正好也被过滤了不会下单
         return orders[orders['qty'] > 0]
 
-    def run_bar(self,
-                date: np.int64, size_type: int,
-                asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> None:
-        """同一截面，时间相同，先平后开"""
+    def run_bar1(self,
+                 date: np.int64, size_type: int,
+                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> None:
+        """一层截面信号处理。只处理同时间截面上所有资产的交易信号
+
+        Parameters
+        ----------
+        date
+        size_type
+        asset
+        size
+        fill_price
+        commission
+
+        """
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price, commission)
+
+        # 记录上次位置
+        self._idx_last_trade = self._idx_curr_trade
 
         # 先平仓
         orders_close = orders[~orders['is_open']]
@@ -326,25 +389,34 @@ class Portfolio:
             _o = orders_open[i]
             self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'], _o['commission'])
 
-    def run_bar2(self,
-                 date: np.int64, size_type: int,
-                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray,
-                 last_price: np.ndarray,
-                 date_diff: bool) -> None:
-        # 先执行交易
-        self.run_bar(date, size_type, asset, size, fill_price, commission)
-        # 更新最新价。浮动盈亏得到了调整
-        self.update_last_price(asset, last_price)
-        # 每日收盘记录绩效
-        if date_diff:
-            self.update_performances(date)
+    def run_bar2(self, arr: np.ndarray) -> None:
+        """二层截面信号处理。在一层截面信号的基础上多了最新价更新，以及绩效记录
 
-    def run_bar3(self, idx: np.ndarray, arr: np.ndarray) -> None:
-        for i, j in zip(idx[:-1], idx[1:]):
-            a = arr[i:j]
-            self.run_bar2(a['date'][-1], a['size_type'][-1],
-                          a['asset'], a['size'], a['fill_price'], a['commission'], a['last_price'],
-                          a['date_diff'][-1])
+        Parameters
+        ----------
+        arr
+            - date
+            - size_type
+            - asset
+            - size
+            - fill_price
+            - last_price
+            - commission
+            - date_diff
+
+        """
+        _date: np.int64 = arr['date'][-1]
+        _size_type: int = arr['size_type'][-1]
+        _date_diff: bool = arr['date_diff'][-1]
+        _asset = arr['asset']
+
+        # 先执行交易
+        self.run_bar1(_date, _size_type, _asset, arr['size'], arr['fill_price'], arr['commission'])
+        # 更新最新价。浮动盈亏得到了调整
+        self.update_last_price(_asset, arr['last_price'])
+        # 每日收盘记录绩效
+        if _date_diff:
+            self.update_performances(_date)
 
     def __str__(self):
         # 这个要少调用，很慢

@@ -1,14 +1,15 @@
 # %%
-import os
+
 # os.environ['NUMBA_DISABLE_JIT'] = '1'
 
 import numpy as np
 import pandas as pd
 
 from lightbt import LightBT, warmup
-from lightbt.enums import SizeType
+from lightbt.enums import SizeType, order_outside_dt
+from lightbt.signals import orders_daily
 from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
-from lightbt.utils import Timer
+from lightbt.utils import Timer, groupby
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
@@ -16,14 +17,14 @@ pd.options.plotting.backend = 'plotly'
 
 # %%
 _N = 365 * 10  # 10年
-_K = 2000  # 2000支股票
+_K = 5000  # 5000支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range('2000-01-1', periods=_N)
 
 conf = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0})
 
-CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0)*np.random.randint(1, 100, _K)
+CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0) * np.random.randint(1, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
 
 SMA10 = CLOSE.rolling(10).mean()
@@ -51,7 +52,10 @@ with Timer():
     print('warmup:', warmup())
 
 # %% 初始化
-bt = LightBT(max_trades=_N * _K, max_performances=_N * _K)
+bt = LightBT(init_cash=0.0,
+             positions_precision=1.0,
+             max_trades=_N * _K,
+             max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
 
@@ -59,18 +63,21 @@ bt.deposit(10000 * 100)
 with Timer():
     bt.setup(conf)
 
+# %% 资产转换，只做一次即可
+df['asset'] = df['asset'].map(bt.mapping_asset_int)
+
 # %% 交易
 with Timer():
-    bt.run_all(df)
+    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
 
 # %% 查看最终持仓
 positions = bt.positions()
 print(positions)
 # %% 查看所有交易记录
-trades = bt.trades()
+trades = bt.trades(all=True)
 print(trades)
 # %% 查看绩效
-perf = bt.performances()
+perf = bt.performances(all=True)
 print(perf)
 # %% 总体绩效
 equity = total_equity(perf)
@@ -92,3 +99,4 @@ pnls.plot()
 pd.options.plotting.backend = 'matplotlib'
 pnls[['PnL', 'CLOSE']].plot(secondary_y='CLOSE')
 # %%
+print(df)
