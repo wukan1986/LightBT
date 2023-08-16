@@ -42,7 +42,7 @@ del SMA20
 df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20']
 
 df['size_type'] = SizeType.TargetPercentValue
-df['size'] = (df['SMA10'] > df['SMA20']) / _K
+df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K
 df['fill_price'] = df['CLOSE']
 df['commission'] = df['CLOSE'] * 0.0005
 df['last_price'] = df['fill_price']
@@ -54,7 +54,7 @@ with Timer():
 # %% 初始化
 bt = LightBT(init_cash=0.0,
              positions_precision=1.0,
-             max_trades=_N * _K,
+             max_trades=_N * _K * 2 // 1,
              max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)

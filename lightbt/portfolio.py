@@ -245,7 +245,7 @@ class Portfolio:
         bool
 
         """
-        if qty <= 0:
+        if qty <= 0.0:
             # 数量不合法，返回。可用于刷新行情但不产生交易记录
             return False
 
@@ -333,26 +333,48 @@ class Portfolio:
         is_open: np.ndarray = np.sign(amount) * np.sign(size)
         is_open = np.where(is_open == 0, amount == 0, is_open > 0)
 
+        amount_abs = np.abs(amount)
+        size_abs = np.abs(size)
+
+        # 创建一个原始订单表，其中存在反手单
+        orders = np.empty(len(asset), dtype=order_inside_dt)
+        orders['asset'][:] = asset
+        orders['commission'][:] = commission
+        orders['fill_price'][:] = fill_price
+        orders['qty'][:] = size_abs
+        orders['is_buy'][:] = size >= 0
+        orders['is_open'][:] = is_open
+
+        # 是否有反手单
+        is_reverse = (~is_open) & (size_abs > amount_abs)
+
+        # 将反手单分离成两单。注意：trades表占用翻倍
+        if np.any(is_reverse):
+            orders1 = orders.copy()
+            orders2 = orders.copy()
+            orders2['is_open'][:] = True
+
+            orders1['qty'][is_reverse] = amount_abs[is_reverse]
+            orders2['qty'][is_reverse] -= amount_abs[is_reverse]
+            # print(orders2[is_reverse])
+
+            orders = np.concatenate((orders1, orders2[is_reverse]))
+
+        qty = orders['qty']
+        is_open = orders['is_open']
+
         if self._positions_precision == 1.0:
             # 提前条件判断，速度能快一些
-            qty = np.abs(size)
             qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9))
         else:
             # 开仓用小数量，平仓用大数量。接近于0时自动调整为0
-            qty = np.abs(size) / self._positions_precision
+            qty /= self._positions_precision
             # 10.2/0.2=50.99999999999999
             qty = np.where(is_open, np.floor(qty + 1e-9), np.ceil(qty - 1e-9)) * self._positions_precision
             # 原数字处理后会有小尾巴，简单处理一下
             qty = np.round(qty, 9)
 
-        # TODO: 是否要将反手拆分成两条？
-        orders = np.empty(len(asset), dtype=order_inside_dt)
-        orders['asset'][:] = asset
-        orders['commission'][:] = commission
-        orders['fill_price'][:] = fill_price
         orders['qty'][:] = qty
-        orders['is_buy'][:] = size >= 0
-        orders['is_open'][:] = is_open
 
         # 过滤无效操作。nan正好也被过滤了不会下单
         return orders[orders['qty'] > 0]
@@ -372,7 +394,9 @@ class Portfolio:
         commission
 
         """
+        # size转换
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price, commission)
+        # 反手拆分成两个订单
 
         # 记录上次位置
         self._idx_last_trade = self._idx_curr_trade

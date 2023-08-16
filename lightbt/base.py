@@ -207,12 +207,13 @@ def warmup() -> float:
                         'commission': 0.0})
 
     df2 = pd.DataFrame({'asset': ['510300', 'IF2309'],
-                        'size': [0, 0],
+                        'size': [0, 1],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-02',
                         'size_type': SizeType.TargetPercentValue,
                         'commission': 0.0})
+
     df = pd.concat([df1, df2])
     df['date'] = pd.to_datetime(df['date'])
 

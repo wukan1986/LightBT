@@ -343,7 +343,7 @@ class Position:
         self._commission = 0.0
 
         # 当前空仓
-        if self.Amount == 0:
+        if self.Amount == 0.0:
             self._value_flow = _value_with_mult(fill_price, qty, mult)
             self._open_value = self._value_flow
             self.AvgPx = fill_price
@@ -361,7 +361,7 @@ class Position:
         # 平仓
         self._pnl = self._calculate_pnl(self.is_long, self.AvgPx, fill_price, qty, mult)
 
-        if self.Qty == qty:
+        if _is_zero(self.Qty - qty):
             # 清仓
             self._value_flow = -self._open_value
             self._open_value = 0.0
