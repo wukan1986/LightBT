@@ -270,9 +270,14 @@ class Position:
         self._margin_ratio = margin_ratio
         self._commission_ratio = commission_ratio
 
-    def settlement(self) -> None:
-        """结算"""
-        pass
+    def settlement(self) -> float:
+        """结算。结算后可能产生现金变动
+
+        1. 逆回购返利息
+        2. 分红
+        3. 手续费减免
+        """
+        return 0.0
 
     def update_last_price(self, last_price: float) -> None:
         """更新最新价。用于计算资金曲线

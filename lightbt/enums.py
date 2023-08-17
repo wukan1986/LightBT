@@ -21,7 +21,7 @@ class SizeTypeT(NamedTuple):
     TargetMargin: int = 6
     # 目标市值占比
     TargetPercentValue: int = 7
-    # 目标保证金点比
+    # 目标保证金占比
     TargetPercentMargin: int = 8
 
 

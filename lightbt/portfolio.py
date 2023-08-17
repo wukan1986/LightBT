@@ -216,7 +216,7 @@ class Portfolio:
     def settlement(self) -> None:
         """结算"""
         for i, pos in enumerate(self._positions):
-            pos.settlement()
+            self._cash += pos.settlement()
 
     def performances(self, all: bool) -> np.ndarray:
         """绩效记录"""
