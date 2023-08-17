@@ -35,8 +35,8 @@ performance_dt = np.dtype([
     ('cash', np.float32),
     ('margin', np.float32),
     ('upnl', np.float32),
-    ('pnls', np.float32),
-    ('commissions', np.float32),
+    ('cum_pnl', np.float32),
+    ('cum_commission', np.float32),
 ], align=True)
 
 # 成交记录。为减少内存，使用float32
@@ -70,8 +70,8 @@ position_dt = np.dtype([
     ('last_price', np.float32),
     ('margin', np.float32),
     ('upnl', np.float32),
-    ('pnls', np.float32),
-    ('commissions', np.float32),
+    ('cum_pnl', np.float32),
+    ('cum_commission', np.float32),
 ], align=True)
 
 # 外部下单指令，用于将用户的指令转成内部指令
@@ -82,7 +82,6 @@ order_outside_dt = np.dtype([
     ('size', float),  # nan时表示此行不参与交易。可用于有持仓但不交易的资产更新最新价
     ('fill_price', float),
     ('last_price', float),
-    ('commission', float),
     ('date_diff', bool),  # 标记换日，会触发绩效更新
 ], align=True)
 
@@ -93,5 +92,4 @@ order_inside_dt = np.dtype([
     ('is_open', bool),
     ('fill_price', float),
     ('qty', float),
-    ('commission', float),
 ], align=True)

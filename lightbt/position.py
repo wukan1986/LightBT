@@ -1,13 +1,15 @@
 import os
 
 import numpy as np
-from numba import objmode, types, njit
+from numba import objmode, types, njit, float64, typeof
 from numba.experimental import jitclass
+
+from lightbt.callbacks import commission_0
 
 __TOL__: float = 1e-6
 
 
-@njit(fastmath=True, nogil=True)
+@njit(float64(float64, float64, float64), fastmath=True, nogil=True)
 def _value_with_mult(price: float, qty: float, mult: float) -> float:
     """计算市值"""
     if mult == 1.0:
@@ -16,7 +18,7 @@ def _value_with_mult(price: float, qty: float, mult: float) -> float:
     return price * qty * mult
 
 
-@njit(fastmath=True, nogil=True)
+@njit(float64(float64, float64, float64), fastmath=True, nogil=True)
 def _avg_with_mult(value: float, qty: float, mult: float) -> float:
     """计算均价"""
     if mult == 1.0:
@@ -25,7 +27,7 @@ def _avg_with_mult(value: float, qty: float, mult: float) -> float:
     return value / qty / mult
 
 
-@njit(fastmath=True, nogil=True)
+@njit(float64(float64, float64), fastmath=True, nogil=True)
 def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
     """计算净现金流"""
     if margin_ratio == 1.0:
@@ -35,7 +37,7 @@ def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
 
 
 @njit(fastmath=True, nogil=True)
-def _is_zero(x, tol=__TOL__):
+def _is_zero(x: float, tol: float = __TOL__) -> float:
     """是否为0
 
     float，double分别遵循R32-24,R64-53的标准。
@@ -58,6 +60,8 @@ class Position:
     _mult: float
     # 保证金率
     _margin_ratio: float
+    # 手续费率
+    _commission_ratio: float
 
     # 最新价。用于计算Value/UPnL
     LastPrice: float
@@ -73,11 +77,11 @@ class Position:
     # 手续费
     _commission: float
     # 累计手续费
-    _commissions: float
+    _cum_commission: float
     # 盈亏
     _pnl: float
     # 累计盈亏
-    _pnls: float
+    _cum_pnl: float
     # 保证金
     _margin: float
     # 开仓市值
@@ -101,6 +105,8 @@ class Position:
 
         self._mult = 1.0
         self._margin_ratio = 1.0
+        self._commission_ratio = 0.0
+        self._commission_fn = commission_0
 
         self.reset()
 
@@ -113,11 +119,11 @@ class Position:
         self.QtySold = 0.0
         self.AvgPx = 0.0
         self._commission = 0.0
-        self._commissions = 0.0
+        self._cum_commission = 0.0
         self._margin = 0.0
         self._open_value = 0.0
         self._pnl = 0.0
-        self._pnls = 0.0
+        self._cum_pnl = 0.0
         self._value_flow = 0.0
         self._net_cash_flow = 0.0
         self._cash_flow = 0.0
@@ -168,14 +174,14 @@ class Position:
         return self._pnl
 
     @property
-    def PnLs(self) -> float:
+    def CumPnL(self) -> float:
         """累计平仓盈亏(未减手续费)"""
-        return self._pnls
+        return self._cum_pnl
 
     @property
-    def Commissions(self) -> float:
+    def CumCommission(self) -> float:
         """累计手续费"""
-        return self._commissions
+        return self._cum_commission
 
     @property
     def CashFlow(self) -> float:
@@ -187,7 +193,15 @@ class Position:
         """持仓权益=保证金+浮动盈亏。受`last_price`影响"""
         return self.Margin + self.UPnL
 
-    def openable(self, cash: float, price: float, qty: float, commission: float) -> bool:
+    def calc_value(self, price: float, qty: float):
+        """计算市值"""
+        return _value_with_mult(price, qty, self._mult)
+
+    def calc_commission(self, is_buy: bool, is_open: bool, value: float, qty: float) -> float:
+        """计算手续费"""
+        return self._commission_fn(is_buy, is_open, value, qty, self._commission_ratio)
+
+    def openable(self, cash: float, value: float, commission: float) -> bool:
         """可开手数
 
         需考虑负价格情况
@@ -198,10 +212,8 @@ class Position:
         ----------
         cash: float
             分配的可用现金。注意：不是总现金。
-        price: float
-            报单价。注意：不是成交价。按涨停价报单，可开手数必然变少。
-        qty: float
-            报单量。注意：不是成交量
+        value: float
+            报单市值
         commission: float
             手续费
 
@@ -212,15 +224,13 @@ class Position:
 
         """
         # TODO: 负手续费的情况下是如何处理？
-        if cash < commission:
+        if cash < 0:
             return False
 
-        # 价格可能为负，导致价值为负
-        val: float = _value_with_mult(price, qty, self._mult)
         if self._margin_ratio == 1.0:
-            return (cash + commission) >= val
+            return (cash + commission) >= value
         else:
-            return (cash + commission) >= val * self._margin_ratio
+            return (cash + commission) >= value * self._margin_ratio
 
     def closable(self, is_long: bool) -> float:
         """可平手数
@@ -240,7 +250,10 @@ class Position:
         else:
             return self.ShortQty
 
-    def setup(self, mult: float = 1.0, margin_ratio: float = 1.0) -> None:
+    def set_commission_fn(self, func=commission_0) -> None:
+        self._commission_fn = func
+
+    def setup(self, mult: float = 1.0, margin_ratio: float = 1.0, commission_ratio: float = 0.0) -> None:
         """配置资产信息
 
         Parameters
@@ -249,10 +262,13 @@ class Position:
             合约乘数
         margin_ratio: float
             保证金率
+        commission_ratio: float
+            手续费率
 
         """
         self._mult = mult
         self._margin_ratio = margin_ratio
+        self._commission_ratio = commission_ratio
 
     def settlement(self) -> None:
         """结算"""
@@ -268,7 +284,7 @@ class Position:
         """
         self.LastPrice = last_price
 
-    def fill(self, is_buy: bool, is_open: bool, fill_price: float, qty: float, commission: float = 0.0) -> None:
+    def fill(self, is_buy: bool, is_open: bool, value: float, fill_price: float, qty: float, commission: float = 0.0) -> None:
         """通过成交回报，更新各字段
 
         Parameters
@@ -277,6 +293,8 @@ class Position:
             是否买入
         is_open: bool
             是否开仓。反手需要标记成平仓
+        value: float
+            开仓市值
         fill_price: float
             成交价
         qty: float
@@ -289,7 +307,7 @@ class Position:
         self._cash_flow = 0.0
 
         # 计算开仓市值，平均价。返回改变的持仓市值
-        self._calculate(is_open, fill_price, qty, commission, self._mult)
+        self._calculate(is_open, value, fill_price, qty, commission, self._mult)
 
         if is_buy:
             self.QtyBought += qty
@@ -320,9 +338,9 @@ class Position:
         # 更新最新价，用于计算盈亏
         self.LastPrice = fill_price
         # 累计盈亏
-        self._pnls += self._pnl
+        self._cum_pnl += self._pnl
         # 累计手续费
-        self._commissions += self._commission
+        self._cum_commission += self._commission
 
         # 这几个值出现接近0时调整成0
         # 有了这个调整后，回测速度反而加快
@@ -335,7 +353,7 @@ class Position:
         value: float = fill_price - avg_price if is_long else avg_price - fill_price
         return qty * value * mult
 
-    def _calculate(self, is_open: bool, fill_price: float, qty: float, commission: float, mult: float) -> None:
+    def _calculate(self, is_open: bool, value: float, fill_price: float, qty: float, commission: float, mult: float) -> None:
         """更新开仓市值和平均价。需用到合约乘数。
         内部函数，不检查合法性。检查提前，有利于加快速度"""
         self._pnl = 0.0
@@ -344,7 +362,7 @@ class Position:
 
         # 当前空仓
         if self.Amount == 0.0:
-            self._value_flow = _value_with_mult(fill_price, qty, mult)
+            self._value_flow = value  # _value_with_mult(fill_price, qty, mult)
             self._open_value = self._value_flow
             self.AvgPx = fill_price
             self._commission = commission
@@ -352,7 +370,8 @@ class Position:
 
         # 开仓。已经到这只能是加仓
         if is_open:
-            self._value_flow = _value_with_mult(fill_price, qty, mult)
+            # 开仓改变的市值流与外部计算结果一样
+            self._value_flow = value  # _value_with_mult(fill_price, qty, mult)
             self._open_value += self._value_flow
             self.AvgPx = _avg_with_mult(self._open_value, self.Qty + qty, mult)
             self._commission = commission
@@ -362,7 +381,7 @@ class Position:
         self._pnl = self._calculate_pnl(self.is_long, self.AvgPx, fill_price, qty, mult)
 
         if _is_zero(self.Qty - qty):
-            # 清仓
+            # 清仓，市值流正好是之前持仓市值
             self._value_flow = -self._open_value
             self._open_value = 0.0
             self.AvgPx = 0.0
@@ -412,8 +431,8 @@ class Position:
             rec['last_price'] = self.LastPrice
             rec['margin'] = self._margin
             rec['asset'] = self.Asset
-            rec['pnls'] = self._pnls
-            rec['commissions'] = self._commissions
+            rec['cum_pnl'] = self._cum_pnl
+            rec['cum_commission'] = self._cum_commission
 
         return rec
 
@@ -446,8 +465,8 @@ class Position:
         rec['margin'] = self._margin
         rec['upnl'] = self.UPnL
         # pnl与commission只记录了产生交易舜时的值，还需要累计值
-        rec['pnls'] = self._pnls
-        rec['commissions'] = self._commissions
+        rec['cum_pnl'] = self._cum_pnl
+        rec['cum_commission'] = self._cum_commission
 
         return rec
 
@@ -461,4 +480,7 @@ class Position:
 
 # 这种写法是为了方便开关断点调试
 if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
-    Position = jitclass(Position)
+    commission_fn_type = typeof(commission_0)
+
+    Position = jitclass(Position,
+                        [('_commission_fn', commission_fn_type)])

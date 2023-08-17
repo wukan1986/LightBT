@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from lightbt import LightBT, warmup
+from lightbt.callbacks import commission_by_value
 from lightbt.enums import SizeType, order_outside_dt
 from lightbt.signals import orders_daily
 from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
@@ -22,7 +23,8 @@ _K = 5000  # 5000支股票
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range('2000-01-1', periods=_N)
 
-conf = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0})
+config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
+                       'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 
 CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0) * np.random.randint(1, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
@@ -44,7 +46,6 @@ df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20']
 df['size_type'] = SizeType.TargetPercentValue
 df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K
 df['fill_price'] = df['CLOSE']
-df['commission'] = df['CLOSE'] * 0.0005
 df['last_price'] = df['fill_price']
 
 # %% 热身
@@ -61,7 +62,7 @@ bt.deposit(10000 * 100)
 
 # %% 配置资产信息
 with Timer():
-    bt.setup(conf)
+    bt.setup(config)
 
 # %% 资产转换，只做一次即可
 df['asset'] = df['asset'].map(bt.mapping_asset_int)
