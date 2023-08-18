@@ -18,7 +18,7 @@ pd.options.plotting.backend = 'plotly'
 
 # %%
 
-_K = 500  # 5000支股票
+_K = 5000  # 5000支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range(start='2000-01-01', end='2010-12-31', freq='B')
@@ -39,31 +39,26 @@ dt['start'] = dt.index
 dt['end'] = dt.index
 dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
 
-# 信号
-size = CLOSE.copy()
-size[:] = np.nan
-
-# 短线大于长线，做多，反之做空
-size.loc[dt['end']] = (SMA10 > SMA20) * 2 - 1
-# 短线大于长线，做多，反之空仓
-size.loc[dt['start']] = (SMA10 > SMA20) * 1
-
 # 等权
-size /= _K
+size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
+size_type.loc[dt['start']] = SizeType.TargetPercentValue
+# size_type[:] = SizeType.TargetPercentValue
 
 df = pd.DataFrame({
     'CLOSE': CLOSE.to_numpy().reshape(-1),
     'SMA10': SMA10.to_numpy().reshape(-1),
     'SMA20': SMA20.to_numpy().reshape(-1),
-    'size': size.to_numpy().reshape(-1),
+    'size_type': size_type.to_numpy().reshape(-1),
 }, index=pd.MultiIndex.from_product([date, asset], names=['date', 'asset'])).reset_index()
 
 del CLOSE
 del SMA10
 del SMA20
-df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size']
+del size_type
+df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type']
 
-df['size_type'] = SizeType.TargetPercentValue
+df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K
+df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K
 df['fill_price'] = df['CLOSE']
 df['last_price'] = df['fill_price']
 

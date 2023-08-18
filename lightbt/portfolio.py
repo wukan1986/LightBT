@@ -404,8 +404,15 @@ class Portfolio:
         fill_price
 
         """
+        # 空指令直接返回
+        if size_type == SizeType.NOP:
+            return
+
         # size转换
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price)
+        # 全nan，不需交易，直接返回。在月度调仓的场景下可减少计算量
+        if len(orders) == 0:
+            return
 
         # 记录上次位置
         self._idx_last_trade = self._idx_curr_trade

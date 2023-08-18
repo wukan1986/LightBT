@@ -5,24 +5,26 @@ import numpy as np
 
 # 此枚举定义参考于vectorbt。多加了与保证金有关类别
 class SizeTypeT(NamedTuple):
+    # 空操作指令
+    NOP: int = 0
     # 下单数量和方向
-    Amount: int = 0
+    Amount: int = 1
     # 下单市值和方向
-    Value: int = 1
+    Value: int = 2
     # 下单保证金和方向
-    Margin: int = 2
+    Margin: int = 3
     # 正数使用现金比例，负数卖出持仓比例
-    Percent: int = 3
+    Percent: int = 4
     # 目标数量和方向
-    TargetAmount: int = 4
+    TargetAmount: int = 5
     # 目标市值和方向
-    TargetValue: int = 5
+    TargetValue: int = 6
     # 目标保证金和方向
-    TargetMargin: int = 6
+    TargetMargin: int = 7
     # 目标市值占比
-    TargetPercentValue: int = 7
+    TargetPercentValue: int = 8
     # 目标保证金占比
-    TargetPercentMargin: int = 8
+    TargetPercentMargin: int = 9
 
 
 SizeType = SizeTypeT()
