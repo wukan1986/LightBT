@@ -17,11 +17,12 @@ pd.set_option('display.width', 1000)
 pd.options.plotting.backend = 'plotly'
 
 # %%
-_N = 365 * 10  # 10年
-_K = 5000  # 5000支股票
+
+_K = 500  # 5000支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
-date = pd.date_range('2000-01-1', periods=_N)
+date = pd.date_range(start='2000-01-01', end='2010-12-31', freq='B')
+_N = len(date)  # 10年
 
 config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
                        'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
@@ -32,19 +33,37 @@ CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
 SMA10 = CLOSE.rolling(10).mean()
 SMA20 = CLOSE.rolling(20).mean()
 
+# 时间处理，每月第一个交易日调仓，每月第一天可能不是交易日
+dt = pd.DataFrame(index=CLOSE.index)
+dt['start'] = dt.index
+dt['end'] = dt.index
+dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
+
+# 信号
+size = CLOSE.copy()
+size[:] = np.nan
+
+# 短线大于长线，做多，反之做空
+size.loc[dt['end']] = (SMA10 > SMA20) * 2 - 1
+# 短线大于长线，做多，反之空仓
+size.loc[dt['start']] = (SMA10 > SMA20) * 1
+
+# 等权
+size /= _K
+
 df = pd.DataFrame({
     'CLOSE': CLOSE.to_numpy().reshape(-1),
     'SMA10': SMA10.to_numpy().reshape(-1),
     'SMA20': SMA20.to_numpy().reshape(-1),
+    'size': size.to_numpy().reshape(-1),
 }, index=pd.MultiIndex.from_product([date, asset], names=['date', 'asset'])).reset_index()
 
 del CLOSE
 del SMA10
 del SMA20
-df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20']
+df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size']
 
 df['size_type'] = SizeType.TargetPercentValue
-df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K
 df['fill_price'] = df['CLOSE']
 df['last_price'] = df['fill_price']
 
@@ -101,3 +120,4 @@ pd.options.plotting.backend = 'matplotlib'
 pnls[['PnL', 'CLOSE']].plot(secondary_y='CLOSE')
 # %%
 print(df)
+# %%
