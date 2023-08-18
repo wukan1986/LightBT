@@ -466,6 +466,7 @@ class Position:
         rec['date'] = date
         rec['cash'] = cash
         rec['asset'] = self.Asset
+        rec['amount'] = self.Amount
         rec['value'] = self.Value
         rec['margin'] = self._margin
         rec['upnl'] = self.UPnL

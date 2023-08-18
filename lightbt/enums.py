@@ -31,6 +31,7 @@ SizeType = SizeTypeT()
 performance_dt = np.dtype([
     ('date', np.int64),
     ('asset', np.uint32),
+    ('amount', np.float32),
     ('value', np.float32),
     ('cash', np.float32),
     ('margin', np.float32),
