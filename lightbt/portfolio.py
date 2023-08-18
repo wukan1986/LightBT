@@ -407,10 +407,14 @@ class Portfolio:
         # 空指令直接返回
         if size_type == SizeType.NOP:
             return
+        # 全空，返回
+        if np.all(np.isnan(size)):
+            return
 
         # size转换
         orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price)
-        # 全nan，不需交易，直接返回。在月度调仓的场景下可减少计算量
+
+        # 过滤后为空
         if len(orders) == 0:
             return
 

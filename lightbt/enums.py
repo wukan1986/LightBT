@@ -5,7 +5,7 @@ import numpy as np
 
 # 此枚举定义参考于vectorbt。多加了与保证金有关类别
 class SizeTypeT(NamedTuple):
-    # 空操作指令
+    # 空操作指令。通过此值比size全nan能减少代码执行
     NOP: int = 0
     # 下单数量和方向
     Amount: int = 1

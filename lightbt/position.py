@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-from numba import objmode, types, njit, float64, typeof
+from numba import objmode, types, njit, float64, typeof, bool_
 from numba.experimental import jitclass
 
 from lightbt.callbacks import commission_0
@@ -9,7 +9,7 @@ from lightbt.callbacks import commission_0
 __TOL__: float = 1e-6
 
 
-@njit(float64(float64, float64, float64), fastmath=True, nogil=True)
+@njit(float64(float64, float64, float64), fastmath=True, nogil=True, cache=True)
 def _value_with_mult(price: float, qty: float, mult: float) -> float:
     """计算市值"""
     if mult == 1.0:
@@ -18,7 +18,7 @@ def _value_with_mult(price: float, qty: float, mult: float) -> float:
     return price * qty * mult
 
 
-@njit(float64(float64, float64, float64), fastmath=True, nogil=True)
+@njit(float64(float64, float64, float64), fastmath=True, nogil=True, cache=True)
 def _avg_with_mult(value: float, qty: float, mult: float) -> float:
     """计算均价"""
     if mult == 1.0:
@@ -27,7 +27,7 @@ def _avg_with_mult(value: float, qty: float, mult: float) -> float:
     return value / qty / mult
 
 
-@njit(float64(float64, float64), fastmath=True, nogil=True)
+@njit(float64(float64, float64), fastmath=True, nogil=True, cache=True)
 def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
     """计算净现金流"""
     if margin_ratio == 1.0:
@@ -36,14 +36,14 @@ def _net_cash_flow_with_margin(value: float, margin_ratio: float) -> float:
     return value * margin_ratio
 
 
-@njit(fastmath=True, nogil=True)
-def _is_zero(x: float, tol: float = __TOL__) -> float:
+@njit(bool_(float64), fastmath=True, nogil=True)
+def _is_zero(x: float) -> bool:
     """是否为0
 
     float，double分别遵循R32-24,R64-53的标准。
     所以float的精度误差在1e-6；double精度误差在1e-15
     """
-    return (x <= tol) and (x >= -tol)
+    return (x <= __TOL__) and (x >= -__TOL__)
 
 
 # 部分参考了SmartQuant部分代码，但又做了大量调整

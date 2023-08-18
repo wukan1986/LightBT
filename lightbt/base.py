@@ -4,11 +4,6 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
-from lightbt.callbacks import commission_by_qty, commission_by_value
-from lightbt.enums import order_outside_dt
-from lightbt.signals import orders_daily
-from lightbt.utils import groupby
-
 
 class LightBT:
     def __init__(self,
@@ -204,6 +199,10 @@ def warmup() -> float:
     # pd.set_option('display.width', 1000)
 
     from lightbt.enums import SizeType
+    from lightbt.callbacks import commission_by_qty, commission_by_value
+    from lightbt.enums import order_outside_dt
+    from lightbt.signals import orders_daily
+    from lightbt.utils import groupby
 
     symbols = [('510300', 1, 1, 0.001, commission_by_qty), ('IF2309', 300, 0.2, 0.0005, commission_by_value), ]
     config = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio', 'commission_ratio', 'commission_fn'])
