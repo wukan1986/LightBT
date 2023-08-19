@@ -91,21 +91,33 @@ equity.plot()
 
 ## 输入格式
 1. date: int64
-    时间日期。需在外部提前转成数字。可用`astype(np.int64)`或`to_records(dtype)`等方法来实现
+    - 时间日期。需在外部提前转成数字。可用`astype(np.int64)`或`to_records(dtype)`等方法来实现
 2. size_type: int
-    数量类型。参考`lightbt.enums.SizeType`
+    - 数量类型。参考`lightbt.enums.SizeType`
 3. asset: int
-    资产ID。由`LightBT.setup`执行结果所确定。可通过`LightBT.asset_str2int`和`LightBT.asset_int2str`进行相互转换
+    - 资产ID。由`LightBT.setup`执行结果所确定。可通过`LightBT.asset_str2int`和`LightBT.asset_int2str`进行相互转换
 4. size: float
-    数量。具体含义需根据`size_type`决定。`nan`是一特殊值。用来表示当前一行不交易。在只更新最新价的需求中将频繁用到。
+    - 数量。具体含义需根据`size_type`决定。`nan`是一特殊值。用来表示当前一行不交易。在只更新最新价的需求中将频繁用到。
 5. fill_price: float
-    成交价。成交价不等于最新价也不等于收盘价。可以用成交均价等一些有意义的价格进行代替。
+    - 成交价。成交价不等于最新价也不等于收盘价。可以用成交均价等一些有意义的价格进行代替。
 6. last_price: float
-    最新价。可用收盘价、结算价等代替。它影响持仓的浮动盈亏。所以在对绩效快照前一定要更新一次
-7. commission: float
-    手续费
-8. date_diff: bool
-    是否换日。在换日的最后时刻需要更新最新价和记录绩效
+    - 最新价。可用收盘价、结算价等代替。它影响持仓的浮动盈亏。所以在对绩效快照前一定要更新一次
+7. date_diff: bool
+    - 是否换日。在换日的最后时刻需要更新最新价和记录绩效
+
+## 配置格式
+通过`LightBT.setup`进行设置
+1. asset: str
+    - 资产名。内部将使用对应的int进行各项处理
+2. mult: float
+    - 合约乘数。股票的合约乘数为1.0
+3. margin_ratio: float
+    - 保证金率。股票的保证金率为1.0
+4. commission_ratio: float
+    - 手续费率参数。具体含义参考`commission_fn`
+5. commission_fn:
+    - 手续费处理函数
+    
 
 ## 二次开发
 ```commandline

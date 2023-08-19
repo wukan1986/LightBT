@@ -4,10 +4,6 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
-from lightbt.enums import order_outside_dt
-from lightbt.signals import orders_daily
-from lightbt.utils import groupby
-
 
 class LightBT:
     def __init__(self,
@@ -63,6 +59,10 @@ class LightBT:
             - asset
             - mult
             - margin_ratio
+            - commission_ratio
+                手续费率
+            - commission_fn
+                手续费计算函数
 
         """
         self.conf = pd.concat([self.conf, df])
@@ -77,9 +77,14 @@ class LightBT:
         asset = np.asarray(conf.index, dtype=int)
         mult = np.asarray(conf['mult'], dtype=float)
         margin_ratio = np.asarray(conf['margin_ratio'], dtype=float)
+        commission_ratio = np.asarray(conf['commission_ratio'], dtype=float)
+        commission_fn = np.asarray(conf['commission_fn'])
 
         # 调用底层的批量处理函数
-        self.pf.setup(asset, mult, margin_ratio)
+        self.pf.setup(asset, mult, margin_ratio, commission_ratio)
+        # 设置手续费函数
+        for aid, fn in zip(asset, commission_fn):
+            self.pf.set_commission_fn(aid, fn)
 
     def asset_str2int(self, strings: Union[List[str], str]) -> Union[List[int], int]:
         """资产转换。字符串转数字"""
@@ -194,25 +199,27 @@ def warmup() -> float:
     # pd.set_option('display.width', 1000)
 
     from lightbt.enums import SizeType
+    from lightbt.callbacks import commission_by_qty, commission_by_value
+    from lightbt.enums import order_outside_dt
+    from lightbt.signals import orders_daily
+    from lightbt.utils import groupby
 
-    symbols = [('510300', 1, 1), ('IF2309', 300, 0.2), ]
-    conf = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio'])
+    symbols = [('510300', 1, 1, 0.001, commission_by_qty), ('IF2309', 300, 0.2, 0.0005, commission_by_value), ]
+    config = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio', 'commission_ratio', 'commission_fn'])
 
     df1 = pd.DataFrame({'asset': ['510300', 'IF2309'],
                         'size': [np.nan, -0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-01',
-                        'size_type': SizeType.TargetPercentValue,
-                        'commission': 0.0})
+                        'size_type': SizeType.TargetPercentValue})
 
     df2 = pd.DataFrame({'asset': ['510300', 'IF2309'],
-                        'size': [0, 1],
+                        'size': [0.5, 0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-02',
-                        'size_type': SizeType.TargetPercentValue,
-                        'commission': 0.0})
+                        'size_type': SizeType.TargetPercentValue})
 
     df = pd.concat([df1, df2])
     df['date'] = pd.to_datetime(df['date'])
@@ -223,7 +230,7 @@ def warmup() -> float:
     bt.deposit(10000 * 20)
     bt.withdraw(10000 * 10)
 
-    bt.setup(conf)
+    bt.setup(config)
     # 只能在setup后才能做map
     df['asset'] = df['asset'].map(bt.mapping_asset_int)
 

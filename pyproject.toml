@@ -17,7 +17,7 @@ classifiers = [
   "Programming Language :: Python"
 ]
 dependencies = [
-    "numba",
+    "numba>=0.57.1",
 ]
 dynamic = ["version"]
 

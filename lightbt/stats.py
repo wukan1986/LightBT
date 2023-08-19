@@ -24,7 +24,8 @@ def total_equity(perf: pd.DataFrame) -> pd.DataFrame:
     >>> equity.plot()
 
     """
-    agg = {'cash': 'last', 'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'pnls': 'sum', 'commissions': 'sum'}
+    # 此处的amount返回的是净持仓数量
+    agg = {'cash': 'last', 'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'cum_pnl': 'sum', 'cum_commission': 'sum', 'amount': 'sum'}
     p = perf.set_index(['date', 'asset']).groupby(by=['date']).agg(agg)
     # 总权益曲线。cash中已经包含了pnls和commissions
     p['equity'] = p['cash'] + p['margin'] + p['upnl']
@@ -63,16 +64,16 @@ def pnl_by_asset(perf, asset: int, close: pd.DataFrame) -> pd.DataFrame:
 
     if close is None:
         df = df1
-        agg = {'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'pnls': 'sum', 'commissions': 'sum'}
+        agg = {'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'cum_pnl': 'sum', 'cum_commission': 'sum', 'amount': 'sum'}
     else:
         df0 = close.reset_index()
         df2 = df0[df0['asset'] == asset]
         df = pd.merge(left=df1, right=df2, left_on=['date', 'asset'], right_on=['date', 'asset'])
-        agg = {'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'pnls': 'sum', 'commissions': 'sum', close.columns[0]: 'last'}
+        agg = {'value': 'sum', 'margin': 'sum', 'upnl': 'sum', 'cum_pnl': 'sum', 'cum_commission': 'sum', 'amount': 'sum', close.columns[0]: 'last'}
 
     p = df.set_index(['date', 'asset']).groupby(by=['date']).agg(agg)
     # 盈亏曲线=持仓盈亏+累计盈亏+累计手续费
-    p['PnL'] = p['upnl'] + p['pnls'] - p['commissions']
+    p['PnL'] = p['upnl'] + p['cum_pnl'] - p['cum_commission']
     return p
 
 
@@ -102,5 +103,5 @@ def pnl_by_assets(perf: pd.DataFrame, assets: List) -> pd.DataFrame:
     # 单资产的盈亏曲线
     df = perf[perf['asset'].isin(assets)]
     df = df.set_index(['date', 'asset'])
-    df['PnL'] = df['upnl'] + df['pnls'] - df['commissions']
+    df['PnL'] = df['upnl'] + df['cum_pnl'] - df['cum_commission']
     return df['PnL'].unstack().fillna(method='ffill')

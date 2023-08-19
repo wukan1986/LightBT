@@ -22,7 +22,8 @@ class Portfolio:
 
     def __init__(self,
                  positions_precision: float = 1.0,
-                 max_trades: int = 1024, max_performances: int = 1024) -> None:
+                 max_trades: int = 1024,
+                 max_performances: int = 1024) -> None:
         """初始化
 
         Parameters
@@ -38,11 +39,11 @@ class Portfolio:
             记录绩效的缓存大小。空间不足时将丢弃
         """
         # https://github.com/numba/numba/issues/8733
-        data_tmp = List()
-        data_tmp.append(Position(0))
-        data_tmp.clear()
+        list_tmp = List()
+        list_tmp.append(Position(0))
+        list_tmp.clear()
+        self._positions = list_tmp
 
-        self._positions = data_tmp
         self._trade_records = np.empty(max_trades, dtype=trade_dt)
         self._position_records = np.empty(1, dtype=position_dt)
         self._performance_records = np.empty(max_performances, dtype=performance_dt)
@@ -114,7 +115,14 @@ class Portfolio:
         self._cash -= cash
         return self._cash
 
-    def setup(self, asset: np.ndarray, mult: np.ndarray, margin_ratio: np.ndarray) -> None:
+    def set_commission_fn(self, asset: int, func) -> None:
+        """设置手续费函数"""
+        pos: Position = self._positions[asset]
+        pos.set_commission_fn(func)
+
+    def setup(self, asset: np.ndarray,
+              mult: np.ndarray, margin_ratio: np.ndarray,
+              commission_ratio: np.ndarray) -> None:
         """批量配置各品种的参数。
 
         1. 有部分品种以前是一种配置，后来又换了配置. 如黄金
@@ -128,6 +136,8 @@ class Portfolio:
             合约乘数
         margin_ratio: np.ndarray
             保证金率
+        commission_ratio: np.ndarray
+            手续费率
 
         """
         # 指定长度进行初始化
@@ -139,7 +149,8 @@ class Portfolio:
         self._position_records = np.empty(len(self._positions), dtype=position_dt)
 
         for i in prange(count):
-            self._positions[asset[i]].setup(mult[i], margin_ratio[i])
+            #
+            self._positions[asset[i]].setup(mult[i], margin_ratio[i], commission_ratio[i])
 
     def _fill_trade_record(self,
                            date: np.int64, asset: int,
@@ -205,7 +216,7 @@ class Portfolio:
     def settlement(self) -> None:
         """结算"""
         for i, pos in enumerate(self._positions):
-            pos.settlement()
+            self._cash += pos.settlement()
 
     def performances(self, all: bool) -> np.ndarray:
         """绩效记录"""
@@ -226,7 +237,7 @@ class Portfolio:
         self._fill_position_records(True)
         return self._position_records
 
-    def order(self, date: np.int64, asset: int, is_buy: bool, is_open: bool, fill_price: float, qty: float, commission: float = 0.0) -> bool:
+    def order(self, date: np.int64, asset: int, is_buy: bool, is_open: bool, fill_price: float, qty: float) -> bool:
         """下单
 
         Parameters
@@ -238,7 +249,6 @@ class Portfolio:
             是否开仓。反手暂时归属于平仓。
         fill_price: float
         qty: float
-        commission: float
 
         Returns
         -------
@@ -250,22 +260,25 @@ class Portfolio:
             return False
 
         pos: Position = self._positions[asset]
+        # 成交价所对应的市值和手续费
+        value = pos.calc_value(fill_price, qty)
+        commission = pos.calc_commission(is_buy, is_open, value, qty)
         if is_open:
             # 可开手数检查
-            if not pos.openable(self._cash, fill_price, qty, commission):
+            if not pos.openable(self._cash, value, commission):
                 return False
         else:
             # TODO: 可能有反手情况。这个以后再处理
             pass
 
-        pos.fill(is_buy, is_open, fill_price, qty, commission)
+        pos.fill(is_buy, is_open, value, fill_price, qty, commission)
         self._cash += pos.CashFlow
 
         self._fill_trade_record(date, asset, is_buy, is_open, fill_price, qty)
 
         return True
 
-    def convert_size(self, size_type: int, asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> np.ndarray:
+    def convert_size(self, size_type: int, asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray) -> np.ndarray:
         """交易数量转换
 
         Parameters
@@ -275,7 +288,6 @@ class Portfolio:
         size: float
             nan时表示不交易
         fill_price
-        commission
 
         """
         self._fill_position_records(False)
@@ -339,7 +351,6 @@ class Portfolio:
         # 创建一个原始订单表，其中存在反手单
         orders = np.empty(len(asset), dtype=order_inside_dt)
         orders['asset'][:] = asset
-        orders['commission'][:] = commission
         orders['fill_price'][:] = fill_price
         orders['qty'][:] = size_abs
         orders['is_buy'][:] = size >= 0
@@ -381,7 +392,7 @@ class Portfolio:
 
     def run_bar1(self,
                  date: np.int64, size_type: int,
-                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray, commission: np.ndarray) -> None:
+                 asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray) -> None:
         """一层截面信号处理。只处理同时间截面上所有资产的交易信号
 
         Parameters
@@ -391,12 +402,21 @@ class Portfolio:
         asset
         size
         fill_price
-        commission
 
         """
+        # 空指令直接返回
+        if size_type == SizeType.NOP:
+            return
+        # 全空，返回
+        if np.all(np.isnan(size)):
+            return
+
         # size转换
-        orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price, commission)
-        # 反手拆分成两个订单
+        orders: np.ndarray = self.convert_size(size_type, asset, size, fill_price)
+
+        # 过滤后为空
+        if len(orders) == 0:
+            return
 
         # 记录上次位置
         self._idx_last_trade = self._idx_curr_trade
@@ -405,13 +425,13 @@ class Portfolio:
         orders_close = orders[~orders['is_open']]
         for i in prange(len(orders_close)):
             _o = orders_close[i]
-            self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'], _o['commission'])
+            self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'])
 
         # 后开仓
         orders_open = orders[orders['is_open']]
         for i in prange(len(orders_open)):
             _o = orders_open[i]
-            self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'], _o['commission'])
+            self.order(date, _o['asset'], _o['is_buy'], _o['is_open'], _o['fill_price'], _o['qty'])
 
     def run_bar2(self, arr: np.ndarray) -> None:
         """二层截面信号处理。在一层截面信号的基础上多了最新价更新，以及绩效记录
@@ -425,7 +445,6 @@ class Portfolio:
             - size
             - fill_price
             - last_price
-            - commission
             - date_diff
 
         """
@@ -435,7 +454,7 @@ class Portfolio:
         _asset = arr['asset']
 
         # 先执行交易
-        self.run_bar1(_date, _size_type, _asset, arr['size'], arr['fill_price'], arr['commission'])
+        self.run_bar1(_date, _size_type, _asset, arr['size'], arr['fill_price'])
         # 更新最新价。浮动盈亏得到了调整
         self.update_last_price(_asset, arr['last_price'])
         # 每日收盘记录绩效
@@ -452,13 +471,16 @@ class Portfolio:
 # 这种写法是为了方便开关断点调试
 if os.environ.get('NUMBA_DISABLE_JIT', '0') != '1':
     # TODO: List支持有问题，不得不这么写，等以后numba修复了再改回来
-    l = List()
-    l.append(Position(0))
-    position_list_type = typeof(l)
+    list_tmp = List()
+    list_tmp.append(Position(0))
+    position_list_type = typeof(list_tmp)
+
     trade_type = typeof(np.empty(1, dtype=trade_dt))
     position_type = typeof(np.empty(1, dtype=position_dt))
     performance_type = typeof(np.empty(1, dtype=performance_dt))
 
     Portfolio = jitclass(Portfolio,
-                         [('_positions', position_list_type), ('_trade_records', trade_type),
-                          ('_position_records', position_type), ('_performance_records', performance_type), ])
+                         [('_positions', position_list_type),
+                          ('_trade_records', trade_type),
+                          ('_position_records', position_type),
+                          ('_performance_records', performance_type), ])
