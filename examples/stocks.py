@@ -27,7 +27,7 @@ _N = len(date)  # 10年
 config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
                        'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 
-CLOSE = np.cumprod(1 + (np.random.rand(_K * _N) - 0.5).reshape(_N, -1) / 100, axis=0) * np.random.randint(1, 100, _K)
+CLOSE = np.cumprod(1 + np.random.uniform(-0.1, 0.1, size=(_N, _K)), axis=0) * np.random.randint(10, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
 
 SMA10 = CLOSE.rolling(10).mean()
@@ -57,8 +57,8 @@ del SMA20
 del size_type
 df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type']
 
-df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K
-df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K
+df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K  # 多空双向
+df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K  # 只多头
 df['fill_price'] = df['CLOSE']
 df['last_price'] = df['fill_price']
 
@@ -69,7 +69,7 @@ with Timer():
 # %% 初始化
 bt = LightBT(init_cash=0.0,
              positions_precision=1.0,
-             max_trades=_N * _K * 2 // 1,
+             max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
              max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
