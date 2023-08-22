@@ -44,21 +44,31 @@ size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns,
 size_type.loc[dt['start']] = SizeType.TargetPercentValue
 # size_type[:] = SizeType.TargetPercentValue
 
+size = SMA10 / SMA20  # 因子
+rank = size.rank(axis=1, pct=False, ascending=False)  # 横截面按从大到小排序。用户需
+# 保留前N支股票
+size[rank > 1000] = np.nan
+# 因子加权。因子值大权重大。也可设成等权
+size = size.div(size.sum(axis=1), axis=0)
+
 df = pd.DataFrame({
     'CLOSE': CLOSE.to_numpy().reshape(-1),
     'SMA10': SMA10.to_numpy().reshape(-1),
     'SMA20': SMA20.to_numpy().reshape(-1),
     'size_type': size_type.to_numpy().reshape(-1),
+    'size': size.to_numpy().reshape(-1),
 }, index=pd.MultiIndex.from_product([date, asset], names=['date', 'asset'])).reset_index()
 
 del CLOSE
 del SMA10
 del SMA20
 del size_type
-df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type']
+del size
+del rank
+df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type', 'size']
 
-df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K  # 多空双向
-df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K  # 只多头
+# df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K  # 多空双向
+# df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K  # 只多头
 df['fill_price'] = df['CLOSE']
 df['last_price'] = df['fill_price']
 
