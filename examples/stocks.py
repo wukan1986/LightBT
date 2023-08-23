@@ -39,26 +39,39 @@ dt['start'] = dt.index
 dt['end'] = dt.index
 dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
 
-# 等权
+# 目标市值
 size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
 size_type.loc[dt['start']] = SizeType.TargetPercentValue
 # size_type[:] = SizeType.TargetPercentValue
+
+# 因子构建，过滤多头与空头
+factor = SMA10 / SMA20 - 1.0  # 因子
+top = factor.rank(axis=1, pct=False, ascending=False) <= 100  # 横截面按从大到小排序
+bottom = factor.rank(axis=1, pct=False, ascending=True) <= 100  # 横截面按从小到大排序
+
+size = pd.DataFrame(0.0, index=CLOSE.index, columns=CLOSE.columns, dtype=float)
+size[top] = factor[top]  # 前N做多
+size[bottom] = factor[bottom]  # 后N做空
+# 因子加权。因子值大权重大。也可设成等权
+size = size.div(size.abs().sum(axis=1), axis=0)
 
 df = pd.DataFrame({
     'CLOSE': CLOSE.to_numpy().reshape(-1),
     'SMA10': SMA10.to_numpy().reshape(-1),
     'SMA20': SMA20.to_numpy().reshape(-1),
     'size_type': size_type.to_numpy().reshape(-1),
+    'size': size.to_numpy().reshape(-1),
 }, index=pd.MultiIndex.from_product([date, asset], names=['date', 'asset'])).reset_index()
 
 del CLOSE
 del SMA10
 del SMA20
 del size_type
-df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type']
+del size
+del top
+del bottom
+df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type', 'size']
 
-df['size'] = ((df['SMA10'] > df['SMA20']) * 2 - 1) / _K  # 多空双向
-df['size'] = ((df['SMA10'] > df['SMA20']) * 1) / _K  # 只多头
 df['fill_price'] = df['CLOSE']
 df['last_price'] = df['fill_price']
 
@@ -89,10 +102,17 @@ with Timer():
 positions = bt.positions()
 print(positions)
 # %% 查看所有交易记录
-trades = bt.trades(all=True)
+trades = bt.trades(return_all=True)
 print(trades)
+trades_stats = bt.trades_stats()
+print(trades_stats)
+roundtrips = bt.roundtrips()
+print(roundtrips)
+roundtrips_stats = bt.roundtrips_stats()
+print(roundtrips_stats)
+
 # %% 查看绩效
-perf = bt.performances(all=True)
+perf = bt.performances(return_all=True)
 print(perf)
 # %% 总体绩效
 equity = total_equity(perf)
@@ -100,14 +120,12 @@ print(equity)
 equity.plot()
 
 # %% 多个资产的收益曲线
-pnls = pnl_by_assets(perf, bt.asset_str2int(['s_0000', 's_0100', 's_0300']))
-pnls.columns = bt.asset_int2str(pnls.columns)
+pnls = pnl_by_assets(perf, ['s_0000', 's_0100', 's_0300'], bt.mapping_asset_int, bt.mapping_int_asset)
 print(pnls)
 pnls.plot()
 
 # %% 单个资产的绩效细节
-tmp = df[['date', 'asset', 'CLOSE']].set_index(['date', 'asset'])
-pnls = pnl_by_asset(perf, bt.asset_str2int(['s_0000']), tmp)
+pnls = pnl_by_asset(perf, 's_0000', df[['date', 'asset', 'CLOSE']], bt.mapping_asset_int, bt.mapping_int_asset)
 print(pnls)
 pnls.plot()
 # %%

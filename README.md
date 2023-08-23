@@ -61,13 +61,19 @@ with Timer():
     print('warmup:', warmup())
 
 # %% 初始化
-bt = LightBT(max_trades=_N * _K, max_performances=_N * _K)
+bt = LightBT(init_cash=0.0,
+             positions_precision=1.0,
+             max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
+             max_performances=_N * _K)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
 
 # %% 配置资产信息
 with Timer():
-    bt.setup(conf)
+    bt.setup(config)
+
+# %% 资产转换，只做一次即可
+df['asset'] = df['asset'].map(bt.mapping_asset_int)
 
 # %% 交易
 with Timer():
@@ -77,10 +83,17 @@ with Timer():
 positions = bt.positions()
 print(positions)
 # %% 查看所有交易记录
-trades = bt.trades()
+trades = bt.trades(return_all=True)
 print(trades)
+trades_stats = bt.trades_stats()
+print(trades_stats)
+roundtrips = bt.roundtrips()
+print(roundtrips)
+roundtrips_stats = bt.roundtrips_stats()
+print(roundtrips_stats)
+
 # %% 查看绩效
-perf = bt.performances()
+perf = bt.performances(return_all=True)
 print(perf)
 # %% 总体绩效
 equity = total_equity(perf)

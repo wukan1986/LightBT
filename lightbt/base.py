@@ -4,6 +4,8 @@ from typing import List, Union
 import numpy as np
 import pandas as pd
 
+from lightbt.stats import calc_trades_stats, calc_roundtrips_stats, trades_to_roundtrips
+
 
 class LightBT:
     def __init__(self,
@@ -126,27 +128,86 @@ class LightBT:
         """出金"""
         return self.pf.withdraw(cash)
 
-    def positions(self, convert_asset: bool = True) -> pd.DataFrame:
+    def positions(self, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
         """持仓记录"""
-        df = pd.DataFrame.from_records(self.pf.positions())
-        if convert_asset:
-            df['asset'] = df['asset'].map(self.mapping_int_asset)
+        records = self.pf.positions()
+        if not readable:
+            return records
+
+        df = pd.DataFrame.from_records(records)
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def trades(self, all: bool, convert_asset: bool = True) -> pd.DataFrame:
-        """成交记录"""
-        df = pd.DataFrame.from_records(self.pf.trades(all))
+    def trades(self, return_all: bool, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+        """成交记录
+
+        Parameters
+        ----------
+        return_all: bool
+            返回所有记录或返回最近一批记录
+        readable: bool
+            返回可读格式
+
+        Returns
+        -------
+        pd.DataFrame or np.ndarray
+
+        """
+        records = self.pf.trades(return_all)
+        if not readable:
+            return records
+
+        df = pd.DataFrame.from_records(records)
         df['date'] = pd.to_datetime(df['date'])
-        if convert_asset:
-            df['asset'] = df['asset'].map(self.mapping_int_asset)
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def performances(self, all: bool, convert_asset: bool = False) -> pd.DataFrame:
-        """持仓记录"""
-        df = pd.DataFrame.from_records(self.pf.performances(all))
+    def performances(self, return_all: bool, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+        """绩效记录"""
+        records = self.pf.performances(return_all)
+        if not readable:
+            return records
+
+        df = pd.DataFrame.from_records(records)
         df['date'] = pd.to_datetime(df['date'])
-        if convert_asset:
-            df['asset'] = df['asset'].map(self.mapping_int_asset)
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
+        return df
+
+    def trades_stats(self, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+        """成交统计"""
+        trades = self.pf.trades(True)
+        stats = calc_trades_stats(trades, len(self.mapping_int_asset))
+        if not readable:
+            return stats
+
+        df = pd.DataFrame.from_records(stats)
+        df['start'] = pd.to_datetime(df['start'])
+        df['end'] = pd.to_datetime(df['end'])
+        df['period'] = pd.to_timedelta(df['period'])
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
+        return df
+
+    def roundtrips(self, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+        """每轮交易记录"""
+        trades = self.pf.trades(True)
+        rounds = trades_to_roundtrips(trades, len(self.mapping_int_asset))
+        if not readable:
+            return rounds
+
+        df = pd.DataFrame.from_records(rounds)
+        df['entry_date'] = pd.to_datetime(df['entry_date'])
+        df['exit_date'] = pd.to_datetime(df['exit_date'])
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
+        return df
+
+    def roundtrips_stats(self, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+        """每轮交易统计"""
+        rounds = self.roundtrips(False)
+        stats = calc_roundtrips_stats(rounds, len(self.mapping_int_asset))
+        if not readable:
+            return stats
+        df = pd.DataFrame.from_records(stats)
+        df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
     def run_bar(self, arr) -> None:
@@ -237,8 +298,8 @@ def warmup() -> float:
     bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
 
     bt.positions()
-    bt.trades(all=True)
-    bt.performances(all=True)
+    bt.trades(return_all=True)
+    bt.performances(return_all=True)
     bt.reset()
 
     toc = time.perf_counter()
