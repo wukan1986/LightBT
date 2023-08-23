@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -28,7 +29,7 @@ class Timer:
         print(f"code executed in {end_time - self.start_time} seconds")
 
 
-def groupby(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
+def groupby(df: pd.DataFrame, by: str, dtype: Optional[np.dtype] = None) -> np.ndarray:
     """简版数据分组
 
     Parameters
@@ -48,8 +49,9 @@ def groupby(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
     `df`一定要提前按`by`排序，否则结果是错的
 
     """
-    # 控制同样的位置。否则record转dtype失败会导致效率低
-    df = df[list(dtype.names)]
+    if dtype is not None:
+        # 控制同样的位置。否则record转dtype失败会导致效率低
+        df = df[list(dtype.names)]
 
     if isinstance(df, pd.DataFrame):
         # recarray转np.ndarray
@@ -66,7 +68,8 @@ def groupby(df: pd.DataFrame, by: str, dtype: np.dtype) -> np.ndarray:
         flag = np.ones(shape=len(dt) + 1, dtype=bool)
         # 前后都为True
         flag[1:-1] = dt[:-1] != dt[1:]
-        idx = np.argwhere(flag)
+        idx = np.argwhere(flag).flatten()
 
     for i, j in zip(idx[:-1], idx[1:]):
+        # 由于标记的位置正好是每段的开始位置，所以j不需加1
         yield arr[i:j]

@@ -218,16 +218,16 @@ class Portfolio:
         for i, pos in enumerate(self._positions):
             self._cash += pos.settlement()
 
-    def performances(self, all: bool) -> np.ndarray:
+    def performances(self, return_all: bool) -> np.ndarray:
         """绩效记录"""
-        if all:
+        if return_all:
             return self._performance_records[:self._idx_curr_performance]
         else:
             return self._performance_records[self._idx_last_performance:self._idx_curr_performance]
 
-    def trades(self, all: bool) -> np.ndarray:
+    def trades(self, return_all: bool) -> np.ndarray:
         """很多变量只记录了瞬时值，当需要时序值时，通过此函数记录下来备用"""
-        if all:
+        if return_all:
             return self._trade_records[:self._idx_curr_trade]
         else:
             return self._trade_records[self._idx_last_trade:self._idx_curr_trade]
