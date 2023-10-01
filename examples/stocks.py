@@ -1,4 +1,13 @@
 # %%
+"""
+每月初做多前100支，做空后100支
+权重按因子值大小进行分配。分配前因子标准化
+
+计算因子值后，第二天早上交易
+
+由于不支持除权除息，所以价格都为后复权价
+"""
+# %%
 
 # os.environ['NUMBA_DISABLE_JIT'] = '1'
 
@@ -18,17 +27,18 @@ pd.options.plotting.backend = 'plotly'
 
 # %%
 
-_K = 5000  # 5000支股票
+_K = 5000  # 多支股票
 
 asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range(start='2000-01-01', end='2010-12-31', freq='B')
 _N = len(date)  # 10年
 
-config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
-                       'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
+config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0, 'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 
 CLOSE = np.cumprod(1 + np.random.uniform(-0.1, 0.1, size=(_N, _K)), axis=0) * np.random.randint(10, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
+
+OPEN = np.cumprod(1 + np.random.uniform(-0.1, 0.1, size=(_N, _K)), axis=0) * np.random.randint(10, 100, _K)
 
 SMA10 = CLOSE.rolling(10).mean()
 SMA20 = CLOSE.rolling(20).mean()
@@ -45,7 +55,15 @@ size_type.loc[dt['start']] = SizeType.TargetPercentValue
 # size_type[:] = SizeType.TargetPercentValue
 
 # 因子构建，过滤多头与空头
-factor = SMA10 / SMA20 - 1.0  # 因子
+factor: pd.DataFrame = SMA10 / SMA20 - 1.0  # 因子
+
+# 收盘时产生信号，第二天开盘交易
+factor = factor.shift(1)
+
+# 因为之后将按因子值进行权重分配，这里需要提前做做标准化
+# 标准化后，前N一定是正数，后N一定是负数
+factor = factor.subtract(factor.mean(axis=1), axis=0).div(factor.std(axis=1, ddof=0), axis=0)
+
 top = factor.rank(axis=1, pct=False, ascending=False) <= 100  # 横截面按从大到小排序
 bottom = factor.rank(axis=1, pct=False, ascending=True) <= 100  # 横截面按从小到大排序
 
@@ -56,13 +74,13 @@ size[bottom] = factor[bottom]  # 后N做空
 size = size.div(size.abs().sum(axis=1), axis=0)
 
 df = pd.DataFrame({
+    'OPEN': OPEN.reshape(-1),
     'CLOSE': CLOSE.to_numpy().reshape(-1),
-    'SMA10': SMA10.to_numpy().reshape(-1),
-    'SMA20': SMA20.to_numpy().reshape(-1),
     'size_type': size_type.to_numpy().reshape(-1),
     'size': size.to_numpy().reshape(-1),
 }, index=pd.MultiIndex.from_product([date, asset], names=['date', 'asset'])).reset_index()
 
+del OPEN
 del CLOSE
 del SMA10
 del SMA20
@@ -70,10 +88,13 @@ del size_type
 del size
 del top
 del bottom
-df.columns = ['date', 'asset', 'CLOSE', 'SMA10', 'SMA20', 'size_type', 'size']
+del factor
+df.columns = ['date', 'asset', 'OPEN', 'CLOSE', 'size_type', 'size']
 
-df['fill_price'] = df['CLOSE']
-df['last_price'] = df['fill_price']
+# 早上开盘时交易。在集合竞价交易可使用开盘价，也可以使用前5分钟VWAP价
+df['fill_price'] = df['OPEN']
+# 每天的收盘价或结算价
+df['last_price'] = df['CLOSE']
 
 # %% 热身
 with Timer():
@@ -96,6 +117,7 @@ df['asset'] = df['asset'].map(bt.mapping_asset_int)
 
 # %% 交易
 with Timer():
+    # 按日更新净值
     bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
 
 # %% 查看最终持仓

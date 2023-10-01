@@ -47,7 +47,7 @@ class LightBT:
     def reset(self):
         """重置。不需要再次`setup`，只需要重新跑一次`run_`即可"""
         self.pf.reset()
-        # 入金
+        # 入初始资金
         self.deposit(self._init_cash)
 
     def setup(self, df: pd.DataFrame) -> None:

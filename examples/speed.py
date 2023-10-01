@@ -1,3 +1,7 @@
+"""
+测试热身第一次和第二次的速度差别
+再测试之后运行多次的耗时
+"""
 import os
 # os.environ['NUMBA_DISABLE_JIT'] = '1'
 import timeit
