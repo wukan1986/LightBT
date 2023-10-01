@@ -255,9 +255,11 @@ class Portfolio:
         bool
 
         """
-        if qty <= 0.0:
-            # 数量不合法，返回。可用于刷新行情但不产生交易记录
-            return False
+        # convert_size时已经过滤了不合法的数量，所以这里注释了
+
+        # if qty <= 0.0:
+        #     # 数量不合法，返回。可用于刷新行情但不产生交易记录
+        #     return False
 
         pos: Position = self._positions[asset]
         # 成交价所对应的市值和手续费
@@ -298,10 +300,24 @@ class Portfolio:
         mult: np.ndarray = _rs['mult']
 
         # 以下的操作size为nan时最终还是nan, 所以可以用来标记只更新最新价
+        if size_type == SizeType.TargetScaleMargin:
+            size = size / np.nansum(np.abs(size))
+            _equity: float = self.Equity
+            size = _equity * size / margin_ratio
+            size_type = SizeType.TargetValue
         if size_type == SizeType.TargetPercentMargin:
             # 总权益转分别使用保证金再转市值
             _equity: float = self.Equity * np.nansum(np.abs(size))
             size = _equity * size / margin_ratio
+            size_type = SizeType.TargetValue
+        if size_type == SizeType.TargetScaleValue:
+            size = size / np.nansum(np.abs(size))
+            _equity: float = self.Equity
+            _ratio: float = np.nansum((np.abs(size) * margin_ratio))
+            if _ratio == 0:
+                size = _equity * size
+            else:
+                size = _equity / _ratio * size
             size_type = SizeType.TargetValue
         if size_type == SizeType.TargetPercentValue:
             # 总权益除保证金率占比，得到总市值，然后得到分别市值

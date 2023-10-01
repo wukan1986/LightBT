@@ -21,10 +21,14 @@ class SizeTypeT(NamedTuple):
     TargetValue: int = 6
     # 目标保证金和方向
     TargetMargin: int = 7
-    # 目标市值占比
+    # 目标市值百分比。size绝对值之和范围[0,1]
     TargetPercentValue: int = 8
-    # 目标保证金占比
-    TargetPercentMargin: int = 9
+    # 目标市值比例。size值可能为1.5:1:-1等
+    TargetScaleValue: int = 9
+    # 目标保证金百分比。size绝对值之和范围[0,1]
+    TargetPercentMargin: int = 10
+    # 目标保证金比例。size值可能为1.5:1:-1等
+    TargetScaleMargin: int = 11
 
 
 SizeType = SizeTypeT()
