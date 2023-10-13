@@ -51,8 +51,8 @@ dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
 
 # 目标市值
 size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
-size_type.loc[dt['start']] = SizeType.TargetPercentValue
-# size_type[:] = SizeType.TargetPercentValue
+size_type.loc[dt['start']] = SizeType.TargetValuePercent
+# size_type[:] = SizeType.TargetValuePercent
 
 # 因子构建，过滤多头与空头
 factor: pd.DataFrame = SMA10 / SMA20 - 1.0  # 因子

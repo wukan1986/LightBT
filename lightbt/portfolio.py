@@ -5,7 +5,7 @@ from numba import typeof, objmode, types, prange
 from numba.experimental import jitclass
 from numba.typed.typedlist import List
 
-from lightbt.enums import SizeType, order_inside_dt, trade_dt, position_dt, performance_dt
+from lightbt.enums import SizeType, trade_dt, position_dt, performance_dt, order_inside_dt
 from lightbt.position import Position
 
 
@@ -299,64 +299,67 @@ class Portfolio:
         amount: np.ndarray = _rs['amount']
         mult: np.ndarray = _rs['mult']
 
-        # 以下的操作size为nan时最终还是nan, 所以可以用来标记只更新最新价
-        if size_type == SizeType.TargetScaleMargin:
-            size = size / np.nansum(np.abs(size))
-            _equity: float = self.Equity
-            size = _equity * size / margin_ratio
+        # 归一时做分母。但必需是没有上游改动
+        equity: float = self.Equity
+        cash: float = self._cash
+        size_abs_sum: float = np.nansum(np.abs(size))
+
+        # 目标保证金比率相关计算。最后转成目标市值
+        if size_type >= SizeType.TargetMargin:
+            if size_type == SizeType.TargetMarginScale:
+                size /= size_abs_sum  # 归一。最终size和是1
+                _equity: float = equity
+                size *= _equity
+            if size_type == SizeType.TargetMarginPercent:
+                _equity: float = equity * size_abs_sum
+                size *= _equity
+            if size_type == SizeType.TargetMargin:
+                pass
+
+            # 统一保证金
+            size /= margin_ratio
             size_type = SizeType.TargetValue
-        if size_type == SizeType.TargetPercentMargin:
-            # 总权益转分别使用保证金再转市值
-            _equity: float = self.Equity * np.nansum(np.abs(size))
-            size = _equity * size / margin_ratio
-            size_type = SizeType.TargetValue
-        if size_type == SizeType.TargetScaleValue:
-            size = size / np.nansum(np.abs(size))
-            _equity: float = self.Equity
+
+        # 目标市值比率相关计算。最后转成目标市值
+        if size_type > SizeType.TargetValue:
+            if size_type == SizeType.TargetValueScale:
+                size /= size_abs_sum
+                _equity: float = equity
+            if size_type == SizeType.TargetValuePercent:
+                _equity: float = equity * size_abs_sum
+
+            # 特殊处理，通过保证金率还原市值占比
             _ratio: float = np.nansum((np.abs(size) * margin_ratio))
-            if _ratio == 0:
-                size = _equity * size
-            else:
-                size = _equity / _ratio * size
+            size *= _equity
+            if _ratio != 0:
+                size /= _ratio
             size_type = SizeType.TargetValue
-        if size_type == SizeType.TargetPercentValue:
-            # 总权益除保证金率占比，得到总市值，然后得到分别市值
-            _equity: float = self.Equity * np.nansum(np.abs(size))
-            _ratio: float = np.nansum((np.abs(size) * margin_ratio))
-            if _ratio == 0:
-                size = _equity * size
-            else:
-                size = _equity / _ratio * size
-            size_type = SizeType.TargetValue
-        if size_type == SizeType.TargetMargin:
-            # 保证金转成市值
-            size = size / margin_ratio
-            size_type = SizeType.TargetValue
+
+        # 使用次数最多的类型
         if size_type == SizeType.TargetValue:
             # 前后市值之差
-            size = size - (fill_price * amount * mult)
+            size -= (fill_price * mult * amount)
             size_type = SizeType.Value
         if size_type == SizeType.TargetAmount:
             # 前后Amout差值
-            size = size - amount
+            size -= amount
             size_type = SizeType.Amount
         if size_type == SizeType.Percent:
             # 买入开仓，用现金转市值
             # 卖出平仓，持仓市值的百分比
-            # TOOD: 由于无法表示卖出开仓。所以只能用在股票市场
-            _cash_per_lot = fill_price * mult * margin_ratio
-            size = np.where(size >= 0, self._cash / _cash_per_lot, amount) * size
+            # TODO: 由于无法表示卖出开仓。所以只能用在股票市场
+            size *= np.where(size >= 0, cash / (fill_price * mult * margin_ratio), amount)
             size_type = SizeType.Amount
         if size_type == SizeType.Margin:
             # 将保证金转换成市值
-            size = size / margin_ratio
+            size /= margin_ratio
             size_type = SizeType.Value
         if size_type == SizeType.Value:
             # 将市值转成手数
-            size = size / (fill_price * mult)
+            size /= (fill_price * mult)
             size_type = SizeType.Amount
-        # if size_type == SizeType.Amount:
-        #     pass
+        if size_type == SizeType.Amount:
+            pass
 
         is_open: np.ndarray = np.sign(amount) * np.sign(size)
         is_open = np.where(is_open == 0, amount == 0, is_open > 0)

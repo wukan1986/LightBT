@@ -53,7 +53,7 @@ dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
 
 # 目标市值
 size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
-size_type.loc[dt['start']] = SizeType.TargetScaleValue
+size_type.loc[dt['start']] = SizeType.TargetValueScale
 
 # 因子构建
 factor: pd.DataFrame = SMA10 / SMA20 - 1.0  # 因子
@@ -64,7 +64,8 @@ factor = factor.shift(1)
 # 分组
 factor = factor.loc[dt['start']].stack()
 factor.index.names = ['date', 'asset']
-quantiles: pd.DataFrame = factor.groupby(by=['date'], group_keys=False).apply(lambda x: pd.qcut(x, 10, duplicates='drop').cat.codes).unstack()
+quantiles: pd.DataFrame = factor.groupby(by=['date'], group_keys=False).apply(
+    lambda x: pd.qcut(x, 10, duplicates='drop').cat.codes).unstack()
 quantiles, _ = quantiles.align(CLOSE, fill_value=-1)
 
 size = pd.DataFrame(0.0, index=CLOSE.index, columns=CLOSE.columns, dtype=float)
