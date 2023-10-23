@@ -299,6 +299,10 @@ class Portfolio:
         amount: np.ndarray = _rs['amount']
         mult: np.ndarray = _rs['mult']
 
+        # 所有的TargetXxx类型，如果出现size=0, 直接处理更精确
+        is_target: bool = size_type >= SizeType.TargetAmount
+        is_zero: np.ndarray = size == 0
+
         # 归一时做分母。但必需是没有上游改动
         equity: float = self.Equity
         cash: float = self._cash
@@ -360,6 +364,10 @@ class Portfolio:
             size_type = SizeType.Amount
         if size_type == SizeType.Amount:
             pass
+
+        if is_target:
+            # 直接取反，回避了前期各种计算导致的误差
+            size[is_zero] = -amount[is_zero]
 
         is_open: np.ndarray = np.sign(amount) * np.sign(size)
         is_open = np.where(is_open == 0, amount == 0, is_open > 0)
