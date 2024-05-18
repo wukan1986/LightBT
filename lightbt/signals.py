@@ -128,12 +128,14 @@ def signals_to_amount(is_long_entry: np.ndarray, is_long_exit: np.ndarray,
         return out_amount
 
 
-def orders_daily(df: pd.DataFrame) -> pd.DataFrame:
+def orders_daily(df: pd.DataFrame, sort: bool = True) -> pd.DataFrame:
     """
 
     Parameters
     ----------
     df
+    sort: bool
+        默认按时间、资产名进行排序
 
     Returns
     -------
@@ -147,7 +149,8 @@ def orders_daily(df: pd.DataFrame) -> pd.DataFrame:
 
     """
     # 全体数据排序，并复制
-    df = df.sort_values(by=['date'])
+    if sort:
+        df = df.sort_values(by=['date', 'asset'])
 
     # 按日期标记，每段的最后一条标记为True。一定要提前排序
     date_0 = df['date'].dt.date
@@ -156,12 +159,14 @@ def orders_daily(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def orders_weekly(df: pd.DataFrame) -> pd.DataFrame:
+def orders_weekly(df: pd.DataFrame, sort: bool = True) -> pd.DataFrame:
     """
 
     Parameters
     ----------
     df
+    sort: bool
+        默认按时间、资产名进行排序
 
     Returns
     -------
@@ -173,9 +178,12 @@ def orders_weekly(df: pd.DataFrame) -> pd.DataFrame:
     -----
     有多处修改了数据，所以需要`copy`。`sort_values`隐含了`copy`
 
+    一定得是每周只交易一次的清单，如果是每天都交易的清单输入，会将5张单子一起，先平后开，导入顺序混乱
+
     """
     # 全体数据排序，并复制
-    df = df.sort_values(by=['date'])
+    if sort:
+        df = df.sort_values(by=['date', 'asset'])
 
     # 按日期标记，每段的最后一条标记为True。一定要提前排序
     date_0 = df['date'].dt.isocalendar().week

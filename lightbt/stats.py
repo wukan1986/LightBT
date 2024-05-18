@@ -140,7 +140,7 @@ def pnl_by_assets(perf: pd.DataFrame,
     df = perf[perf['asset'].isin(assets)]
     df = df.set_index(['date', 'asset'])
     df['PnL'] = df['upnl'] + df['cum_pnl'] - df['cum_commission']
-    return df['PnL'].unstack().fillna(method='ffill')
+    return df['PnL'].unstack().ffill()
 
 
 def trades_to_roundtrips(trades: np.ndarray, asset_count: int) -> np.ndarray:

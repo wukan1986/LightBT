@@ -304,18 +304,23 @@ class Portfolio:
         is_zero: np.ndarray = size == 0
 
         # 归一时做分母。但必需是没有上游改动
+        _equity: float = 0.0
         equity: float = self.Equity
         cash: float = self._cash
         size_abs_sum: float = np.nansum(np.abs(size))
+        if size_abs_sum == 0:
+            # 全0表示清仓
+            if size_type > SizeType.TargetAmount:
+                size_type = SizeType.TargetAmount
 
         # 目标保证金比率相关计算。最后转成目标市值
         if size_type >= SizeType.TargetMargin:
             if size_type == SizeType.TargetMarginScale:
                 size /= size_abs_sum  # 归一。最终size和是1
-                _equity: float = equity
+                _equity = equity
                 size *= _equity
             if size_type == SizeType.TargetMarginPercent:
-                _equity: float = equity * size_abs_sum
+                _equity = equity * size_abs_sum
                 size *= _equity
             if size_type == SizeType.TargetMargin:
                 pass
@@ -328,9 +333,9 @@ class Portfolio:
         if size_type > SizeType.TargetValue:
             if size_type == SizeType.TargetValueScale:
                 size /= size_abs_sum
-                _equity: float = equity
+                _equity = equity
             if size_type == SizeType.TargetValuePercent:
-                _equity: float = equity * size_abs_sum
+                _equity = equity * size_abs_sum
 
             # 特殊处理，通过保证金率还原市值占比
             _ratio: float = np.nansum((np.abs(size) * margin_ratio))

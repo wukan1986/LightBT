@@ -7,19 +7,19 @@
 
 由于不支持除权除息，所以价格都为后复权价
 """
-# %%
-
-# os.environ['NUMBA_DISABLE_JIT'] = '1'
-
 import numpy as np
 import pandas as pd
 
 from lightbt import LightBT, warmup
 from lightbt.callbacks import commission_by_value
-from lightbt.enums import SizeType, order_outside_dt
+from lightbt.enums import order_outside_dt, SizeType
 from lightbt.signals import orders_daily
-from lightbt.stats import pnl_by_assets, total_equity, pnl_by_asset
+from lightbt.stats import total_equity, pnl_by_asset, pnl_by_assets
 from lightbt.utils import Timer, groupby
+
+# %%
+# import os
+# os.environ['NUMBA_DISABLE_JIT'] = '1'
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
@@ -33,8 +33,6 @@ asset = [f's_{i:04d}' for i in range(_K)]
 date = pd.date_range(start='2000-01-01', end='2010-12-31', freq='B')
 _N = len(date)  # 10年
 
-config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0, 'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
-
 CLOSE = np.cumprod(1 + np.random.uniform(-0.1, 0.1, size=(_N, _K)), axis=0) * np.random.randint(10, 100, _K)
 CLOSE = pd.DataFrame(CLOSE, index=date, columns=asset)
 
@@ -47,7 +45,7 @@ SMA20 = CLOSE.rolling(20).mean()
 dt = pd.DataFrame(index=CLOSE.index)
 dt['start'] = dt.index
 dt['end'] = dt.index
-dt = dt.resample('M').agg({'start': 'first', 'end': 'last'})
+dt = dt.resample('ME').agg({'start': 'first', 'end': 'last'})
 
 # 目标市值
 size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
@@ -96,9 +94,11 @@ df['fill_price'] = df['OPEN']
 # 每天的收盘价或结算价
 df['last_price'] = df['CLOSE']
 
+df.to_parquet('tmp.parquet')
+df = pd.read_parquet('tmp.parquet')
+
 # %% 热身
-with Timer():
-    print('warmup:', warmup())
+print('warmup:', warmup())
 
 # %% 初始化
 bt = LightBT(init_cash=0.0,
@@ -109,6 +109,9 @@ bt = LightBT(init_cash=0.0,
 bt.deposit(10000 * 100)
 
 # %% 配置资产信息
+asset = df['asset'].unique()
+config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
+                       'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 with Timer():
     bt.setup(config)
 
@@ -118,7 +121,12 @@ df['asset'] = df['asset'].map(bt.mapping_asset_int)
 # %% 交易
 with Timer():
     # 按日更新净值
-    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
+    bt.run_bars(groupby(orders_daily(df, sort=True), by='date', dtype=order_outside_dt))
+
+# perf = bt.performances(return_all=True)
+# s1 = total_equity(perf)['equity']
+# print(s1.tail())
+
 
 # %% 查看最终持仓
 positions = bt.positions()
