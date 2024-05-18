@@ -193,7 +193,7 @@ class Position:
         """持仓权益=保证金+浮动盈亏。受`last_price`影响"""
         return self.Margin + self.UPnL
 
-    def calc_value(self, price: float, qty: float):
+    def calc_value(self, price: float, qty: float)->float:
         """计算市值"""
         return _value_with_mult(price, qty, self._mult)
 
@@ -289,7 +289,8 @@ class Position:
         """
         self.LastPrice = last_price
 
-    def fill(self, is_buy: bool, is_open: bool, value: float, fill_price: float, qty: float, commission: float = 0.0) -> None:
+    def fill(self, is_buy: bool, is_open: bool, value: float, fill_price: float, qty: float,
+             commission: float = 0.0) -> None:
         """通过成交回报，更新各字段
 
         Parameters
@@ -358,7 +359,8 @@ class Position:
         value: float = fill_price - avg_price if is_long else avg_price - fill_price
         return qty * value * mult
 
-    def _calculate(self, is_open: bool, value: float, fill_price: float, qty: float, commission: float, mult: float) -> None:
+    def _calculate(self, is_open: bool, value: float, fill_price: float, qty: float, commission: float,
+                   mult: float) -> None:
         """更新开仓市值和平均价。需用到合约乘数。
         内部函数，不检查合法性。检查提前，有利于加快速度"""
         self._pnl = 0.0
@@ -442,7 +444,8 @@ class Position:
         return rec
 
     def to_record_trade(self, rec: np.ndarray,
-                        date: np.int64, is_buy: bool, is_open: bool, fill_price: float, qty: float, cash: float) -> np.ndarray:
+                        date: np.int64, is_buy: bool, is_open: bool, fill_price: float, qty: float,
+                        cash: float) -> np.ndarray:
         """订单对象转订单记录"""
         rec['asset'] = self.Asset
         rec['amount'] = self.Amount

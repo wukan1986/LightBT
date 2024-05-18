@@ -266,21 +266,22 @@ def warmup() -> float:
     from lightbt.utils import groupby
 
     symbols = [('510300', 1, 1, 0.001, commission_by_qty), ('IF2309', 300, 0.2, 0.0005, commission_by_value), ]
-    config = pd.DataFrame.from_records(symbols, columns=['asset', 'mult', 'margin_ratio', 'commission_ratio', 'commission_fn'])
+    config = pd.DataFrame.from_records(symbols,
+                                       columns=['asset', 'mult', 'margin_ratio', 'commission_ratio', 'commission_fn'])
 
     df1 = pd.DataFrame({'asset': ['510300', 'IF2309'],
                         'size': [np.nan, -0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-01',
-                        'size_type': SizeType.TargetPercentValue})
+                        'size_type': SizeType.TargetValuePercent})
 
     df2 = pd.DataFrame({'asset': ['510300', 'IF2309'],
                         'size': [0.5, 0.5],
                         'fill_price': [4.0, 4000.0],
                         'last_price': [4.0, 4000.0],
                         'date': '2023-08-02',
-                        'size_type': SizeType.TargetPercentValue})
+                        'size_type': SizeType.TargetValuePercent})
 
     df = pd.concat([df1, df2])
     df['date'] = pd.to_datetime(df['date'])
