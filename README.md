@@ -65,8 +65,7 @@ from lightbt.utils import Timer
 # 省略代码......
 
 # %% 热身
-with Timer():
-   print('warmup:', warmup())
+print('warmup:', warmup())
 
 # %% 初始化
 bt = LightBT(init_cash=0.0,
@@ -78,14 +77,14 @@ bt.deposit(10000 * 100)
 
 # %% 配置资产信息
 with Timer():
-   bt.setup(config)
+    bt.setup(config)
 
 # %% 资产转换，只做一次即可
 df['asset'] = df['asset'].map(bt.mapping_asset_int)
 
 # %% 交易
 with Timer():
-   bt.run_bars(groupby(orders_daily(df, sort=True), by='date', dtype=order_outside_dt))
+    bt.run_bars(groupby(orders_daily(df, sort=True), by='date', dtype=order_outside_dt))
 
 # %% 查看最终持仓
 positions = bt.positions()
@@ -123,10 +122,13 @@ equity.plot()
 - 但实盘中平仓要等成交释放资金后才能再开仓，如果资金非常多，一起开平也可以
 
 `groupby`是用来分批的工具，可以使用多个参数进行多重分组，
-如参数为`groupby(, by=['date'])`时就是一天一个交易清单，如果需要收盘开仓，早盘平仓 ，可以`date`中的时间`精确到小时`
+如参数为`groupby(by=['date'])`时就是一天一个交易清单，如果需要收盘开仓，早盘平仓 ，可以`date`中的时间`精确到小时`做成每天两批
 
-部分工具的选出前10等功能，可能由于前20个值都一样，这时一定要考察更多的指标来确定顺序，比如多考察股票名。否则结果可能每次都不一样。
+### 结果稳定性
 
+1. 部分工具的选出前10等功能，可能由于前20个值都一样，这时一定要考察更多的指标来确定顺序，比如多考察股票名。否则结果可能每次都不一样。
+2. `config`函输入`asset`也需要提前排序
+3. `groupby`前也要排序
 
 ## 输入格式
 

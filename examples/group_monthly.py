@@ -95,7 +95,7 @@ bt = LightBT(init_cash=10000 * 100,  # 初始资金
              max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
              max_performances=_N * _K)
 
-asset = df['asset'].unique()
+asset = sorted(df['asset'].unique())
 config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
                        'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 

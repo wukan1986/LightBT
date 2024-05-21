@@ -89,7 +89,7 @@ bt = LightBT(init_cash=10000 * 100,  # 初始资金
              max_performances=_N * _K)
 
 # %% 配置资产信息
-asset = df['asset'].unique()
+asset = sorted(df['asset'].unique())
 config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
                        'commission_ratio': 0.0005, 'commission_fn': commission_by_value})
 with Timer():
