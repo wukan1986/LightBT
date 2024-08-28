@@ -213,6 +213,7 @@ def calc_roundtrips_stats(roundtrips: np.ndarray, asset_count: int) -> np.ndarra
     groups = groupby(roundtrips, by='asset', dtype=None)
 
     records = np.zeros(asset_count, dtype=roundtrip_stats_dt)
+    i = 0
     for i, g in enumerate(groups):
         rec = records[i]
 
@@ -253,6 +254,7 @@ def calc_trades_stats(trades: np.ndarray, asset_count: int) -> np.ndarray:
     groups = groupby(trades, by='asset', dtype=None)
 
     records = np.zeros(asset_count, dtype=trades_stats_dt)
+    i = 0
     for i, g in enumerate(groups):
         rec = records[i]
 
