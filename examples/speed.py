@@ -15,6 +15,7 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 
 if __name__ == '__main__':
+    print('start')
     print('warmup:', warmup())
     print('warmup:', warmup())
     print(timeit.timeit('warmup()', number=1000, globals=locals()))
