@@ -174,6 +174,8 @@ os.environ['NUMBA_DISABLE_JIT'] = '1'
 
 `numba`的JIT模式下是无法直接调试的，编译也花时间，可以先添加环境变量`NUMBA_DISABLE_JIT=1`，禁止JIT模式。
 
+数据量较小时，禁用JIT模式反而速度更快。
+
 ## 二次开发
 
 ```commandline
