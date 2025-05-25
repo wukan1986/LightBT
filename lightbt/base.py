@@ -3,7 +3,6 @@ from typing import List, Union
 
 import numpy as np
 import pandas as pd
-
 from lightbt.stats import calc_trades_stats, calc_roundtrips_stats, trades_to_roundtrips
 
 
@@ -13,6 +12,7 @@ class LightBT:
                  positions_precision: float = 1.0,
                  max_trades: int = 10000,
                  max_performances: int = 10000,
+                 unit: str = 'ns'
                  ) -> None:
         """初始化
 
@@ -24,6 +24,8 @@ class LightBT:
             记录成交的缓存大小。空间不足时将丢弃
         max_performances: int
             记录绩效的缓存大小。空间不足时将丢弃
+        unit:str
+            pd.to_datetime的unit参数
 
         """
         from lightbt.portfolio import Portfolio
@@ -32,6 +34,7 @@ class LightBT:
         self._positions_precision = positions_precision
         self._max_trades = max_trades
         self._max_performances = max_performances
+        self._unit = unit
 
         self.pf = Portfolio(positions_precision=self._positions_precision,
                             max_trades=self._max_trades,
@@ -147,6 +150,8 @@ class LightBT:
             返回所有记录或返回最近一批记录
         readable: bool
             返回可读格式
+        unit: str
+            时间单位
 
         Returns
         -------
@@ -158,18 +163,19 @@ class LightBT:
             return records
 
         df = pd.DataFrame.from_records(records)
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], unit=self._unit)
         df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
-    def performances(self, return_all: bool, readable: bool = True) -> Union[pd.DataFrame, np.ndarray]:
+    def performances(self, return_all: bool, readable: bool = True) -> Union[
+        pd.DataFrame, np.ndarray]:
         """绩效记录"""
         records = self.pf.performances(return_all)
         if not readable:
             return records
 
         df = pd.DataFrame.from_records(records)
-        df['date'] = pd.to_datetime(df['date'])
+        df['date'] = pd.to_datetime(df['date'], unit=self._unit)
         df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
@@ -181,9 +187,9 @@ class LightBT:
             return stats
 
         df = pd.DataFrame.from_records(stats)
-        df['start'] = pd.to_datetime(df['start'])
-        df['end'] = pd.to_datetime(df['end'])
-        df['period'] = pd.to_timedelta(df['period'])
+        df['start'] = pd.to_datetime(df['start'], unit=self._unit)
+        df['end'] = pd.to_datetime(df['end'], unit=self._unit)
+        df['period'] = pd.to_timedelta(df['period'], unit=self._unit)
         df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
@@ -195,8 +201,8 @@ class LightBT:
             return rounds
 
         df = pd.DataFrame.from_records(rounds)
-        df['entry_date'] = pd.to_datetime(df['entry_date'])
-        df['exit_date'] = pd.to_datetime(df['exit_date'])
+        df['entry_date'] = pd.to_datetime(df['entry_date'], unit=self._unit)
+        df['exit_date'] = pd.to_datetime(df['exit_date'], unit=self._unit)
         df['asset'] = df['asset'].map(self.mapping_int_asset)
         return df
 
@@ -285,10 +291,11 @@ def warmup() -> float:
 
     df = pd.concat([df1, df2])
     df['date'] = pd.to_datetime(df['date'])
+    unit = df['date'].dtype.name[-3:-1]
 
     tic = time.perf_counter()
 
-    bt = LightBT(init_cash=10000 * 50)
+    bt = LightBT(init_cash=10000 * 50, unit=unit)
     bt.deposit(10000 * 20)
     bt.withdraw(10000 * 10)
 
@@ -296,7 +303,7 @@ def warmup() -> float:
     # 只能在setup后才能做map
     df['asset'] = df['asset'].map(bt.mapping_asset_int)
 
-    bt.run_bars(groupby(orders_daily(df), by='date', dtype=order_outside_dt))
+    bt.run_bars(groupby(orders_daily(df, sort=True), by='date', dtype=order_outside_dt))
 
     bt.positions()
     bt.trades(return_all=True)

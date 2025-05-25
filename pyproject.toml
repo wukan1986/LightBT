@@ -1,28 +1,32 @@
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "lightbt"
 authors = [
-    {name = "wukan", email = "wu-kan@163.com"},
+    { name = "wukan", email = "wu-kan@163.com" },
 ]
 description = "lightweight backtester"
 readme = "README.md"
 requires-python = ">=3.7"
 keywords = ["backtest"]
-license = {text = "BSD-3-Clause"}
+license = { text = "BSD-3-Clause" }
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Programming Language :: Python"
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python"
 ]
 dependencies = [
     "numba>=0.57.1",
 ]
 dynamic = ["version"]
 
-[tool.setuptools]
-packages = ["lightbt"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.setuptools.dynamic]
-version = {attr = "lightbt._version.__version__"}
+[tool.hatch.version]
+path = "lightbt/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["lightbt"]
+include-package-data = true
+
+[tool.hatch.build.targets.sdist]
+include = ["lightbt*"]

@@ -153,7 +153,7 @@ class Portfolio:
             self._positions[asset[i]].setup(mult[i], margin_ratio[i], commission_ratio[i])
 
     def _fill_trade_record(self,
-                           date: np.int64, asset: int,
+                           date: np.uint64, asset: int,
                            is_buy: bool, is_open: bool, fill_price: float, qty: float) -> None:
         """遇到有效成交时自动更新，所以内容直接取即可"""
         if self._idx_curr_trade >= self._max_trades:
@@ -179,7 +179,7 @@ class Portfolio:
                 continue
             pos.update_last_price(last_price[i])
 
-    def update_performances(self, date: np.int64) -> None:
+    def update_performances(self, date: np.uint64) -> None:
         """更新绩效"""
         cash: float = self._cash
         # 上次的位置
@@ -193,7 +193,7 @@ class Portfolio:
 
             self._idx_curr_performance += 1
 
-    def update(self, date: np.int64, asset: np.ndarray, last_price: np.ndarray, do_settlement: bool) -> None:
+    def update(self, date: np.uint64, asset: np.ndarray, last_price: np.ndarray, do_settlement: bool) -> None:
         """更新价格。记录绩效
 
         Parameters
@@ -237,7 +237,7 @@ class Portfolio:
         self._fill_position_records(True)
         return self._position_records
 
-    def order(self, date: np.int64, asset: int, is_buy: bool, is_open: bool, fill_price: float, qty: float) -> bool:
+    def order(self, date: np.uint64, asset: int, is_buy: bool, is_open: bool, fill_price: float, qty: float) -> bool:
         """下单
 
         Parameters
@@ -423,7 +423,7 @@ class Portfolio:
         return orders[orders['qty'] > 0]
 
     def run_bar1(self,
-                 date: np.int64, size_type: int,
+                 date: np.uint64, size_type: int,
                  asset: np.ndarray, size: np.ndarray, fill_price: np.ndarray) -> None:
         """一层截面信号处理。只处理同时间截面上所有资产的交易信号
 
@@ -480,7 +480,7 @@ class Portfolio:
             - date_diff
 
         """
-        _date: np.int64 = arr['date'][-1]
+        _date: np.uint64 = arr['date'][-1]
         _size_type: int = arr['size_type'][-1]
         _date_diff: bool = arr['date_diff'][-1]
         _asset = arr['asset']

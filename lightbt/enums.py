@@ -35,7 +35,7 @@ SizeType = SizeTypeT()
 
 # 绩效统计。为减少内存，使用float32
 performance_dt = np.dtype([
-    ('date', np.int64),  # 日期时间
+    ('date', np.uint64),  # 日期时间
     ('asset', np.uint32),  # 资产ID
     ('amount', np.float32),  # 净持仓量。负数表示空头
     ('value', np.float32),  # 净持仓市值。负数表示空头
@@ -48,7 +48,7 @@ performance_dt = np.dtype([
 
 # 成交记录。为减少内存，使用float32
 trade_dt = np.dtype([
-    ('date', np.int64),  # 日期时间
+    ('date', np.uint64),  # 日期时间
     ('asset', np.uint32),  # 资产ID
     ('is_buy', np.bool_),  # 是否买入。
     ('is_open', np.bool_),  # 是否开平。开一定是开，平有可能含反手。反手也可以拆成两单
@@ -83,7 +83,7 @@ position_dt = np.dtype([
 
 # 外部下单指令，用于将用户的指令转成内部指令
 order_outside_dt = np.dtype([
-    ('date', np.int64),  # 日期时间
+    ('date', np.uint64),  # 日期时间
     ('size_type', int),  # size字段类型
     ('asset', int),  # 资产ID
     ('size', float),  # nan时表示此行不参与交易。可用于有持仓但不交易的资产更新最新价
@@ -104,9 +104,9 @@ order_inside_dt = np.dtype([
 # 成交统计。条目数一般等于资产数量
 trades_stats_dt = np.dtype([
     ('asset', np.uint32),  # 资产ID
-    ('start', np.int64),  # 第一条记录时间
-    ('end', np.int64),  # 最后一条记录时间
-    ('period', np.int64),  # 期
+    ('start', np.uint64),  # 第一条记录时间
+    ('end', np.uint64),  # 最后一条记录时间
+    ('period', np.uint64),  # 期
     ('total_count', np.uint32),  # 总条数
     ('buy_count', np.uint32),  # 买入条数
     ('sell_count', np.uint32),  # 卖出条数
@@ -131,10 +131,10 @@ roundtrip_dt = np.dtype([
     ('is_long', np.bool_),  # 是否多头
     ('is_close', np.bool_),  # 是否已平
     ('qty', np.float32),  # 数量
-    ('entry_date', np.int64),  # 入场时间
+    ('entry_date', np.uint64),  # 入场时间
     ('entry_price', np.float32),  # 入场价
     ('entry_commission', np.float32),  # 入场手续费
-    ('exit_date', np.int64),  # 出场时间
+    ('exit_date', np.uint64),  # 出场时间
     ('exit_price', np.float32),  # 出场价
     ('exit_commission', np.float32),  # 出场手续费
     ('pnl', np.float32),  # 本轮平仓盈亏

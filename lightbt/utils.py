@@ -29,6 +29,10 @@ class Timer:
         print(f"code executed in {end_time - self.start_time} seconds")
 
 
+def get_dtypes(dtype):
+    return {a: b for a, b in dtype.descr}
+
+
 def groupby(df: pd.DataFrame, by: str, dtype: Optional[np.dtype] = None) -> np.ndarray:
     """简版数据分组
 
@@ -55,7 +59,7 @@ def groupby(df: pd.DataFrame, by: str, dtype: Optional[np.dtype] = None) -> np.n
 
     if isinstance(df, pd.DataFrame):
         # recarray转np.ndarray
-        arr = np.asarray(df.to_records(index=False), dtype=dtype)
+        arr = df.to_records(index=False, column_dtypes=get_dtypes(dtype))
 
         # 这里支持复合分组
         idx = df.groupby(by=by)['asset'].count().cumsum().to_numpy()

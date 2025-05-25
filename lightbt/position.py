@@ -444,7 +444,7 @@ class Position:
         return rec
 
     def to_record_trade(self, rec: np.ndarray,
-                        date: np.int64, is_buy: bool, is_open: bool, fill_price: float, qty: float,
+                        date: np.uint64, is_buy: bool, is_open: bool, fill_price: float, qty: float,
                         cash: float) -> np.ndarray:
         """订单对象转订单记录"""
         rec['asset'] = self.Asset
@@ -464,7 +464,7 @@ class Position:
 
         return rec
 
-    def to_record_performance(self, rec: np.ndarray, date: np.int64, cash: float) -> np.ndarray:
+    def to_record_performance(self, rec: np.ndarray, date: np.uint64, cash: float) -> np.ndarray:
         """转绩效"""
         rec['date'] = date
         rec['cash'] = cash
