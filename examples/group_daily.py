@@ -52,7 +52,8 @@ factor = factor.shift(1)
 # 分组
 factor = factor.stack()
 factor.index.names = ['date', 'asset']
-quantile: pd.DataFrame = factor.groupby(by=['date'], group_keys=False).apply(lambda x: pd.qcut(x, _Q, labels=False, duplicates='drop')).unstack()
+quantile: pd.DataFrame = factor.groupby(by=['date'], group_keys=False).apply(
+    lambda x: pd.qcut(x, _Q, labels=False, duplicates='drop')).unstack()
 quantile, _ = quantile.align(CLOSE, fill_value=-1)
 row_num = pd.DataFrame(0, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
 row_num[:] = np.arange(len(CLOSE)).reshape(-1, 1) % _P
@@ -83,10 +84,12 @@ df['last_price'] = df['fill_price']
 print('warmup:', warmup())
 
 # %% 初始化
+unit = df['date'].dtype.name[-3:-1]
 bt = LightBT(init_cash=10000 * 100,  # 初始资金
              positions_precision=1.0,
              max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
-             max_performances=_N * _K)
+             max_performances=_N * _K,
+             unit=unit)
 
 # %% 配置资产信息
 asset = sorted(df['asset'].unique())

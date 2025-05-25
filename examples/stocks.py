@@ -49,7 +49,7 @@ dt = dt.resample('ME').agg({'start': 'first', 'end': 'last'})
 
 # 目标市值
 size_type = pd.DataFrame(SizeType.NOP, index=CLOSE.index, columns=CLOSE.columns, dtype=int)
-size_type.loc[dt['start']] = SizeType.TargetValuePercent
+# size_type.loc[dt['start']] = SizeType.TargetValuePercent
 # size_type[:] = SizeType.TargetValuePercent
 
 # 因子构建，过滤多头与空头
@@ -101,10 +101,12 @@ df = pd.read_parquet('tmp.parquet')
 print('warmup:', warmup())
 
 # %% 初始化
+unit = df['date'].dtype.name[-3:-1]
 bt = LightBT(init_cash=0.0,
              positions_precision=1.0,
              max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
-             max_performances=_N * _K)
+             max_performances=_N * _K,
+             unit=unit)
 # 入金。必需先入金，否则资金为0无法交易
 bt.deposit(10000 * 100)
 

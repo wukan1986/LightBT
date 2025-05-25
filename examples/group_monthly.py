@@ -90,10 +90,12 @@ df['last_price'] = df['fill_price']
 print('warmup:', warmup())
 
 # %% 初始化
+unit = df['date'].dtype.name[-3:-1]
 bt = LightBT(init_cash=10000 * 100,  # 初始资金
              positions_precision=1.0,
              max_trades=_N * _K * 2 // 1,  # 反手占两条记录，所以预留2倍空间比较安全
-             max_performances=_N * _K)
+             max_performances=_N * _K,
+             unit=unit)
 
 asset = sorted(df['asset'].unique())
 config = pd.DataFrame({'asset': asset, 'mult': 1.0, 'margin_ratio': 1.0,
